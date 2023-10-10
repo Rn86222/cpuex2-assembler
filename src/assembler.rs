@@ -396,11 +396,18 @@ pub fn assemble(path: &str) {
                             let binary_lines: Vec<&str> = binary_lines.split('\n').collect();
                             for binary in binary_lines {
                                 if binary == "???" {
-                                    println!("???");
+                                    print!("\0\0\0\0");
+                                    eprintln!("unexpected instruction: {}", line);
                                     line_count += 1;
                                 } else {
-                                    let num: i64 = i64::from_str_radix(binary, 2).unwrap();
-                                    println!("{:>032b}", num);
+                                    let num: u32 = u32::from_str_radix(binary, 2).unwrap();
+                                    print!(
+                                        "{}{}{}{}",
+                                        (num & 0xff) as u8 as char,
+                                        ((num >> 8) & 0xff) as u8 as char,
+                                        ((num >> 16) & 0xff) as u8 as char,
+                                        ((num >> 24) & 0xff) as u8 as char
+                                    );
                                     line_count += 1;
                                 }
                             }
