@@ -360,6 +360,23 @@ fn instruction_to_binary(
     }
 }
 
+fn line_count_of(inst: Instruction) -> usize {
+    let name: &str = &inst.name;
+    let operands = &inst.operands;
+    match name {
+        "li" => {
+            assert_eq!(operands.len(), 2);
+            let imm = i32::from_str_radix(&operands[1], 10).unwrap();
+            if -2_i32.pow(12 - 1) <= imm && imm <= 2_i32.pow(12 - 1) {
+                1
+            } else {
+                2
+            }
+        }
+        _ => 1,
+    }
+}
+
 fn create_label_address_map(path: &str) -> HashMap<String, usize> {
     let mut label_address_map: HashMap<String, usize> = HashMap::new();
     match File::open(path) {
@@ -375,7 +392,14 @@ fn create_label_address_map(path: &str) -> HashMap<String, usize> {
                     line.pop();
                     label_address_map.insert(line, line_count * 4);
                 } else if line.len() != 0 {
-                    line_count += 1;
+                    match parse_instruction(&line) {
+                        None => {
+                            line_count += 1;
+                        }
+                        Some(inst) => {
+                            line_count += line_count_of(inst);
+                        }
+                    }
                 }
             }
         }
