@@ -10,17 +10,27 @@ struct Instruction {
 }
 
 fn parse_instruction(line: &str) -> Option<Instruction> {
-    let splited: Vec<&str> = line.split_whitespace().collect();
-    if splited.len() == 0 {
+    let no_comment_line;
+    if let Some(index) = line.find('#') {
+        no_comment_line = &line[0..index];
+    } else {
+        no_comment_line = line;
+    }
+    let line = no_comment_line.trim();
+    let name;
+    let operands_line;
+    if let Some(index) = line.find(' ') {
+        name = line[0..index].to_string();
+        operands_line = &line[index..];
+    } else {
         return None;
     }
-    let name = String::from(splited[0]);
+    let splited: Vec<&str> = operands_line.split(',').collect();
+
     let mut operands = vec![];
-    for i in 1..splited.len() {
+    for i in 0..splited.len() {
         let mut operand = String::from(splited[i]);
-        if i != splited.len() - 1 {
-            operand.pop().unwrap();
-        }
+        operand = operand.trim().to_string();
         operands.push(operand);
     }
     Some(Instruction { name, operands })
@@ -404,7 +414,7 @@ pub fn assemble(path: &str, verbose: &str) {
                                     if verbose == "2" {
                                         println!("{:>032b}", num);
                                     } else if verbose == "16" {
-                                        println!("{:>08X}", num);
+                                        println!("{:>08x}", num);
                                     } else {
                                         print!(
                                             "{}{}{}{}",
