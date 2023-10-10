@@ -373,7 +373,7 @@ fn create_label_address_map(path: &str) -> HashMap<String, usize> {
     label_address_map
 }
 
-pub fn assemble(path: &str) {
+pub fn assemble(path: &str, verbose: &str) {
     let label_address_map = create_label_address_map(path);
     match File::open(path) {
         Err(e) => {
@@ -401,13 +401,19 @@ pub fn assemble(path: &str) {
                                     line_count += 1;
                                 } else {
                                     let num: u32 = u32::from_str_radix(binary, 2).unwrap();
-                                    print!(
-                                        "{}{}{}{}",
-                                        (num & 0xff) as u8 as char,
-                                        ((num >> 8) & 0xff) as u8 as char,
-                                        ((num >> 16) & 0xff) as u8 as char,
-                                        ((num >> 24) & 0xff) as u8 as char
-                                    );
+                                    if verbose == "2" {
+                                        println!("{:>032b}", num);
+                                    } else if verbose == "16" {
+                                        println!("{:>08X}", num);
+                                    } else {
+                                        print!(
+                                            "{}{}{}{}",
+                                            (num & 0xff) as u8 as char,
+                                            ((num >> 8) & 0xff) as u8 as char,
+                                            ((num >> 16) & 0xff) as u8 as char,
+                                            ((num >> 24) & 0xff) as u8 as char
+                                        );
+                                    }
                                     line_count += 1;
                                 }
                             }
