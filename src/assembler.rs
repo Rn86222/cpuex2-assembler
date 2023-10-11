@@ -36,7 +36,7 @@ fn parse_instruction(line: &str) -> Option<Instruction> {
     Some(Instruction { name, operands })
 }
 
-fn register(reg: &String) -> String {
+fn format_int_register(reg: &String) -> String {
     let reg: &str = &reg.clone();
     match reg {
         "zero" => format!("{:>05b}", 0),
@@ -81,6 +81,50 @@ fn register(reg: &String) -> String {
     }
 }
 
+fn format_float_register(reg: &String) -> String {
+    let reg: &str = &reg.clone();
+    assert!(reg.len() >= 2);
+    let mut reg = String::from(reg);
+    let second: &str = &reg[1..2].to_string();
+    match second {
+        "t" => {
+            reg.remove(0);
+            reg.remove(1);
+            let index = u8::from_str_radix(&reg, 10).unwrap();
+            if index <= 7 {
+                format!("{:>05b}", index)
+            } else {
+                assert!(8 <= index && index <= 7);
+                format!("{:>05b}", index + 20)
+            }
+        }
+        "s" => {
+            reg.remove(0);
+            reg.remove(1);
+            let index = u8::from_str_radix(&reg, 10).unwrap();
+            if index <= 1 {
+                format!("{:>05b}", index + 8)
+            } else {
+                assert!(2 <= index && index <= 11);
+                format!("{:>05b}", index + 16)
+            }
+        }
+        "a" => {
+            reg.remove(0);
+            reg.remove(1);
+            let index = u8::from_str_radix(&reg, 10).unwrap();
+            assert!(index <= 7);
+            format!("{:>05b}", index + 10)
+        }
+        _ => {
+            reg.remove(0);
+            let index = u8::from_str_radix(&reg, 10).unwrap();
+            assert!(index < 31);
+            format!("{:>05b}", index)
+        }
+    }
+}
+
 fn imm12(value: &String) -> String {
     let value = i32::from_str_radix(value, 10).unwrap();
     let formatted = format!("{:>012b}", value);
@@ -111,13 +155,13 @@ fn upimm20(value: &String) -> String {
 
 fn rd_imm12rs1(operands: &Vec<String>, funct3: u8) -> String {
     assert_eq!(operands.len(), 2);
-    let rd = register(&operands[0]);
+    let rd = format_int_register(&operands[0]);
     let imm12rs1: Vec<&str> = operands[1].split('(').collect();
     assert_eq!(imm12rs1.len(), 2);
     let imm12 = imm12(&String::from(imm12rs1[0]));
     let mut rs1 = String::from(imm12rs1[1]);
     rs1.pop();
-    let rs1 = register(&rs1);
+    let rs1 = format_int_register(&rs1);
     let funct3 = format!("{:>03b}", funct3);
     format!("{}{}{}{}", imm12, rs1, funct3, rd)
 }
@@ -128,8 +172,8 @@ fn format_rd_imm12rs1(operands: &Vec<String>, funct3: u8, op: u8) -> String {
 
 fn rd_rs1_imm12(operands: &Vec<String>, funct3: u8) -> String {
     assert_eq!(operands.len(), 3);
-    let rd = register(&operands[0]);
-    let rs1 = register(&operands[1]);
+    let rd = format_int_register(&operands[0]);
+    let rs1 = format_int_register(&operands[1]);
     let imm12 = imm12(&operands[2]);
     let funct3 = format!("{:>03b}", funct3);
     format!("{}{}{}{}", imm12, rs1, funct3, rd)
@@ -141,8 +185,8 @@ fn format_rd_rs1_imm12(operands: &Vec<String>, funct3: u8, op: u8) -> String {
 
 fn rd_rs1_uimm5(operands: &Vec<String>, funct3: u8, funct7: u8) -> String {
     assert_eq!(operands.len(), 3);
-    let rd = register(&operands[0]);
-    let rs1 = register(&operands[1]);
+    let rd = format_int_register(&operands[0]);
+    let rs1 = format_int_register(&operands[1]);
     let uimm5 = uimm5(&operands[2]);
     let funct3 = format!("{:>03b}", funct3);
     let funct7 = format!("{:>07b}", funct7);
@@ -155,7 +199,7 @@ fn format_rd_rs1_uimm5(operands: &Vec<String>, funct3: u8, funct7: u8, op: u8) -
 
 fn rd_upimm20(operands: &Vec<String>) -> String {
     assert_eq!(operands.len(), 2);
-    let rd = register(&operands[0]);
+    let rd = format_int_register(&operands[0]);
     let upimm20 = upimm20(&operands[1]);
     format!("{}{}", upimm20, rd)
 }
@@ -166,7 +210,7 @@ fn format_rd_upimm20(operands: &Vec<String>, op: u8) -> String {
 
 fn rs2_imm12rs1(operands: &Vec<String>, funct3: u8) -> String {
     assert_eq!(operands.len(), 2);
-    let rs2 = register(&operands[0]);
+    let rs2 = format_int_register(&operands[0]);
     let imm12rs1: Vec<&str> = operands[1].split('(').collect();
     assert_eq!(imm12rs1.len(), 2);
     let imm12 = imm12(&String::from(imm12rs1[0]));
@@ -175,7 +219,7 @@ fn rs2_imm12rs1(operands: &Vec<String>, funct3: u8) -> String {
     let imm_4_0 = imm12_str[7..12].to_string();
     let mut rs1 = String::from(imm12rs1[1]);
     rs1.pop();
-    let rs1 = register(&rs1);
+    let rs1 = format_int_register(&rs1);
     let funct3 = format!("{:>03b}", funct3);
     format!("{}{}{}{}{}", imm_11_5, rs2, rs1, funct3, imm_4_0)
 }
@@ -186,9 +230,9 @@ fn format_rs2_imm12rs1(operands: &Vec<String>, funct3: u8, op: u8) -> String {
 
 fn rd_rs1_rs2(operands: &Vec<String>, funct3: u8, funct7: u8) -> String {
     assert_eq!(operands.len(), 3);
-    let rd = register(&operands[0]);
-    let rs1 = register(&operands[1]);
-    let rs2 = register(&operands[2]);
+    let rd = format_int_register(&operands[0]);
+    let rs1 = format_int_register(&operands[1]);
+    let rs2 = format_int_register(&operands[2]);
     let funct3 = format!("{:>03b}", funct3);
     let funct7 = format!("{:>07b}", funct7);
     format!("{}{}{}{}{}", funct7, rs2, rs1, funct3, rd)
@@ -205,8 +249,8 @@ fn rs1_rs2_label(
     label_address_map: &HashMap<String, usize>,
 ) -> String {
     assert_eq!(operands.len(), 3);
-    let rs1 = register(&operands[0]);
-    let rs2 = register(&operands[1]);
+    let rs1 = format_int_register(&operands[0]);
+    let rs2 = format_int_register(&operands[1]);
     let jump_address = *label_address_map.get(&operands[2]).unwrap();
     let mut jump_offset = jump_address as i32 - current_address as i32;
     jump_offset >>= 1;
@@ -242,7 +286,7 @@ fn rd_label(
     label_address_map: &HashMap<String, usize>,
 ) -> String {
     assert_eq!(operands.len(), 2);
-    let rd = register(&operands[0]);
+    let rd = format_int_register(&operands[0]);
     let jump_address = *label_address_map.get(&operands[1]).unwrap();
     let mut jump_offset = jump_address as i32 - current_address as i32;
     jump_offset >>= 1;
@@ -265,6 +309,49 @@ fn format_rd_label(
         rd_label(operands, current_address, label_address_map),
         op
     )
+}
+
+fn fd_fs1_fs2_fs3(operands: &Vec<String>, funct2: u8, funct3: u8) -> String {
+    assert_eq!(operands.len(), 4);
+    let fd = format_float_register(&operands[0]);
+    let fs1 = format_float_register(&operands[1]);
+    let fs2 = format_float_register(&operands[2]);
+    let fs3 = format_float_register(&operands[3]);
+    let funct2 = format!("{:>02b}", funct2);
+    let funct3 = format!("{:>03b}", funct3);
+    format!("{}{}{}{}{}{}", fs3, funct2, fs2, fs1, funct3, fd)
+}
+
+fn format_fd_fs1_fs2_fs3(operands: &Vec<String>, funct2: u8, funct3: u8, op: u8) -> String {
+    format!("{}{:>07b}", fd_fs1_fs2_fs3(operands, funct2, funct3), op)
+}
+
+fn fd_fs1_fs2(operands: &Vec<String>, funct3: u8, funct7: u8) -> String {
+    assert_eq!(operands.len(), 3);
+    let fd = format_float_register(&operands[0]);
+    let fs1 = format_float_register(&operands[1]);
+    let fs2 = format_float_register(&operands[2]);
+    let funct3 = format!("{:>03b}", funct3);
+    let funct7 = format!("{:>07b}", funct7);
+    format!("{}{}{}{}{}", funct7, fs2, fs1, funct3, fd)
+}
+
+fn format_fd_fs1_fs2(operands: &Vec<String>, funct3: u8, funct7: u8, op: u8) -> String {
+    format!("{}{:>07b}", fd_fs1_fs2(operands, funct3, funct7), op)
+}
+
+fn fd_fs1(operands: &Vec<String>, funct3: u8, funct7: u8) -> String {
+    assert_eq!(operands.len(), 2);
+    let fd = format_float_register(&operands[0]);
+    let rs2 = "00000";
+    let fs1 = format_float_register(&operands[1]);
+    let funct3 = format!("{:>03b}", funct3);
+    let funct7 = format!("{:>07b}", funct7);
+    format!("{}{}{}{}{}", funct7, rs2, fs1, funct3, fd)
+}
+
+fn format_fd_fs1(operands: &Vec<String>, funct3: u8, funct7: u8, op: u8) -> String {
+    format!("{}{:>07b}", fd_fs1(operands, funct3, funct7), op)
 }
 
 fn instruction_to_binary(
@@ -312,6 +399,34 @@ fn instruction_to_binary(
         "bgeu" => format_rs1_rs2_label(operands, 0b111, 99, current_address, label_address_map),
         "jalr" => format_rd_rs1_imm12(operands, 0b000, 103),
         "jal" => format_rd_label(operands, 111, current_address, label_address_map),
+        // TODO: how to decide rounding mode? (funct3)
+        // TODO: how to decide floating point format? (funct7)
+        "fmadd" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 67),
+        "fmsub" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 71),
+        "fnmsub" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 75),
+        "fnmadd" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 79),
+        "fadd" => format_fd_fs1_fs2(operands, 0b000, 0b0000000, 83),
+        "fsub" => format_fd_fs1_fs2(operands, 0b000, 0b0000100, 83),
+        "fmul" => format_fd_fs1_fs2(operands, 0b000, 0b0001000, 83),
+        "fdiv" => format_fd_fs1_fs2(operands, 0b000, 0b0001100, 83),
+        "fsqrt" => format_fd_fs1(operands, 0b000, 0b0101100, 83),
+        "fsgnj" => format_fd_fs1_fs2(operands, 0b000, 0b0010000, 83),
+        "fsgnjn" => format_fd_fs1_fs2(operands, 0b001, 0b0010000, 83),
+        "fsgnjx" => format_fd_fs1_fs2(operands, 0b010, 0b0010000, 83),
+        "fmin" => format_fd_fs1_fs2(operands, 0b000, 0b0010100, 83),
+        "fmax" => format_fd_fs1_fs2(operands, 0b001, 0b0010100, 83),
+        "feq" => format_fd_fs1_fs2(operands, 0b010, 0b1010000, 83),
+        "flt" => format_fd_fs1_fs2(operands, 0b001, 0b1010000, 83),
+        "fle" => format_fd_fs1_fs2(operands, 0b000, 0b1010000, 83),
+        "fclass" => format_fd_fs1(operands, 0b001, 0b1110000, 83),
+        "mul" => format_rd_rs1_rs2(operands, 0b000, 0b0000001, 51),
+        "mulh" => format_rd_rs1_rs2(operands, 0b001, 0b0000001, 51),
+        "mulhsu" => format_rd_rs1_rs2(operands, 0b010, 0b0000001, 51),
+        "mulhu" => format_rd_rs1_rs2(operands, 0b011, 0b0000001, 51),
+        "div" => format_rd_rs1_rs2(operands, 0b100, 0b0000001, 51),
+        "divu" => format_rd_rs1_rs2(operands, 0b101, 0b0000001, 51),
+        "rem" => format_rd_rs1_rs2(operands, 0b110, 0b0000001, 51),
+        "remu" => format_rd_rs1_rs2(operands, 0b111, 0b0000001, 51),
         "mv" => {
             let mut new_operands = operands.clone();
             new_operands.push(String::from("0"));
