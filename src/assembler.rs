@@ -340,18 +340,89 @@ fn format_fd_fs1_fs2(operands: &Vec<String>, funct3: u8, funct7: u8, op: u8) -> 
     format!("{}{:>07b}", fd_fs1_fs2(operands, funct3, funct7), op)
 }
 
-fn fd_fs1(operands: &Vec<String>, funct3: u8, funct7: u8) -> String {
+fn fd_fs1_with_rs2(operands: &Vec<String>, funct3: u8, funct7: u8, rs2: u8) -> String {
     assert_eq!(operands.len(), 2);
     let fd = format_float_register(&operands[0]);
-    let rs2 = "00000";
     let fs1 = format_float_register(&operands[1]);
     let funct3 = format!("{:>03b}", funct3);
     let funct7 = format!("{:>07b}", funct7);
+    let rs2 = format!("{:>05b}", rs2);
     format!("{}{}{}{}{}", funct7, rs2, fs1, funct3, fd)
 }
 
-fn format_fd_fs1(operands: &Vec<String>, funct3: u8, funct7: u8, op: u8) -> String {
-    format!("{}{:>07b}", fd_fs1(operands, funct3, funct7), op)
+fn format_fd_fs1_with_rs2(
+    operands: &Vec<String>,
+    funct3: u8,
+    funct7: u8,
+    rs2: u8,
+    op: u8,
+) -> String {
+    format!(
+        "{}{:>07b}",
+        fd_fs1_with_rs2(operands, funct3, funct7, rs2),
+        op
+    )
+}
+
+fn rd_fs1_with_rs2(operands: &Vec<String>, funct3: u8, funct7: u8, rs2: u8) -> String {
+    assert_eq!(operands.len(), 2);
+    let rd = format_int_register(&operands[0]);
+    let fs1 = format_float_register(&operands[1]);
+    let funct3 = format!("{:>03b}", funct3);
+    let funct7 = format!("{:>07b}", funct7);
+    let rs2 = format!("{:>05b}", rs2);
+    format!("{}{}{}{}{}", funct7, rs2, fs1, funct3, rd)
+}
+
+fn format_rd_fs1_with_rs2(
+    operands: &Vec<String>,
+    funct3: u8,
+    funct7: u8,
+    rs2: u8,
+    op: u8,
+) -> String {
+    format!(
+        "{}{:>07b}",
+        rd_fs1_with_rs2(operands, funct3, funct7, rs2),
+        op
+    )
+}
+
+fn fd_imm12rs1(operands: &Vec<String>, funct3: u8) -> String {
+    assert_eq!(operands.len(), 2);
+    let fd = format_float_register(&operands[0]);
+    let imm12rs1: Vec<&str> = operands[1].split('(').collect();
+    assert_eq!(imm12rs1.len(), 2);
+    let imm12 = imm12(&String::from(imm12rs1[0]));
+    let mut rs1 = String::from(imm12rs1[1]);
+    rs1.pop();
+    let rs1 = format_int_register(&rs1);
+    let funct3 = format!("{:>03b}", funct3);
+    format!("{}{}{}{}", imm12, rs1, funct3, fd)
+}
+
+fn format_fd_imm12rs1(operands: &Vec<String>, funct3: u8, op: u8) -> String {
+    format!("{}{:>07b}", fd_imm12rs1(operands, funct3), op)
+}
+
+fn fs2_imm12rs1(operands: &Vec<String>, funct3: u8) -> String {
+    assert_eq!(operands.len(), 2);
+    let fs2 = format_float_register(&operands[0]);
+    let imm12rs1: Vec<&str> = operands[1].split('(').collect();
+    assert_eq!(imm12rs1.len(), 2);
+    let imm12 = imm12(&String::from(imm12rs1[0]));
+    let imm12_str: &str = &imm12;
+    let imm_11_5 = imm12_str[0..7].to_string();
+    let imm_4_0 = imm12_str[7..12].to_string();
+    let mut rs1 = String::from(imm12rs1[1]);
+    rs1.pop();
+    let rs1 = format_int_register(&rs1);
+    let funct3 = format!("{:>03b}", funct3);
+    format!("{}{}{}{}{}", imm_11_5, fs2, rs1, funct3, imm_4_0)
+}
+
+fn format_fs2_imm12rs1(operands: &Vec<String>, funct3: u8, op: u8) -> String {
+    format!("{}{:>07b}", fs2_imm12rs1(operands, funct3), op)
 }
 
 fn instruction_to_binary(
@@ -409,7 +480,7 @@ fn instruction_to_binary(
         "fsub" => format_fd_fs1_fs2(operands, 0b000, 0b0000100, 83),
         "fmul" => format_fd_fs1_fs2(operands, 0b000, 0b0001000, 83),
         "fdiv" => format_fd_fs1_fs2(operands, 0b000, 0b0001100, 83),
-        "fsqrt" => format_fd_fs1(operands, 0b000, 0b0101100, 83),
+        "fsqrt" => format_fd_fs1_with_rs2(operands, 0b000, 0b0101100, 0b00000, 83),
         "fsgnj" => format_fd_fs1_fs2(operands, 0b000, 0b0010000, 83),
         "fsgnjn" => format_fd_fs1_fs2(operands, 0b001, 0b0010000, 83),
         "fsgnjx" => format_fd_fs1_fs2(operands, 0b010, 0b0010000, 83),
@@ -418,7 +489,15 @@ fn instruction_to_binary(
         "feq" => format_fd_fs1_fs2(operands, 0b010, 0b1010000, 83),
         "flt" => format_fd_fs1_fs2(operands, 0b001, 0b1010000, 83),
         "fle" => format_fd_fs1_fs2(operands, 0b000, 0b1010000, 83),
-        "fclass" => format_fd_fs1(operands, 0b001, 0b1110000, 83),
+        "fclass" => format_rd_fs1_with_rs2(operands, 0b001, 0b1110000, 0b00000, 83),
+        "flw" => format_fd_imm12rs1(operands, 0b010, 7),
+        "fsw" => format_fs2_imm12rs1(operands, 0b010, 39),
+        "fcvt.w.s" => format_rd_fs1_with_rs2(operands, 0b000, 0b1100000, 0b00000, 83),
+        "fcvt.wu.s" => format_rd_fs1_with_rs2(operands, 0b000, 0b1100000, 0b00001, 83),
+        "fcvt.s.w" => format_fd_fs1_with_rs2(operands, 0b000, 0b1101000, 0b00000, 83),
+        "fcvt.s.wu" => format_fd_fs1_with_rs2(operands, 0b000, 0b1101000, 0b00001, 83),
+        "fmv.x.w" => format_rd_fs1_with_rs2(operands, 0b000, 0b1110000, 0b00000, 83),
+        "fmv.w.x" => format_fd_fs1_with_rs2(operands, 0b000, 0b1111000, 0b00000, 83),
         "mul" => format_rd_rs1_rs2(operands, 0b000, 0b0000001, 51),
         "mulh" => format_rd_rs1_rs2(operands, 0b001, 0b0000001, 51),
         "mulhsu" => format_rd_rs1_rs2(operands, 0b010, 0b0000001, 51),
@@ -428,9 +507,8 @@ fn instruction_to_binary(
         "rem" => format_rd_rs1_rs2(operands, 0b110, 0b0000001, 51),
         "remu" => format_rd_rs1_rs2(operands, 0b111, 0b0000001, 51),
         // pseudo-instructions
-        "mv" => {
-            let mut new_operands = operands.clone();
-            new_operands.push(String::from("0"));
+        "nop" => {
+            let new_operands = vec![String::from("x0"), String::from("x0"), String::from("0")];
             format_rd_rs1_imm12(&new_operands, 0b000, 19)
         }
         "li" => {
@@ -443,17 +521,79 @@ fn instruction_to_binary(
                 format_rd_rs1_imm12(&new_operands, 0b000, 19)
             } else {
                 let mut first_new_operands = vec![operands[0].clone()];
-                first_new_operands.push((imm >> 12).to_string());
-                let first = format_rd_upimm20(&first_new_operands, 55);
                 let mut second_new_operands = vec![operands[0].clone(), operands[0].clone()];
                 second_new_operands.push((imm & 4095).to_string());
+                if (imm & 4095) & (1 << 11) != 0 {
+                    first_new_operands.push(((imm >> 12) + 1).to_string());
+                } else {
+                    first_new_operands.push((imm >> 12).to_string());
+                }
+                let first = format_rd_upimm20(&first_new_operands, 55);
                 let second = format_rd_rs1_imm12(&second_new_operands, 0b000, 19);
                 format!("{}\n{}", first, second)
             }
         }
-        "j" => {
-            let new_operands = vec![String::from("x0"), operands[0].clone()];
-            format_rd_label(&new_operands, 111, current_address, label_address_map)
+        "mv" => {
+            let mut new_operands = operands.clone();
+            new_operands.push(String::from("0"));
+            format_rd_rs1_imm12(&new_operands, 0b000, 19)
+        }
+        "not" => {
+            let mut new_operands = operands.clone();
+            new_operands.push(String::from("-1"));
+            format_rd_rs1_imm12(&new_operands, 0b100, 19)
+        }
+        "neg" => {
+            let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
+            format_rd_rs1_rs2(&new_operands, 0b000, 0b0100000, 51)
+        }
+        "seqz" => {
+            let new_operands = vec![operands[0].clone(), operands[1].clone(), String::from("1")];
+            format_rd_rs1_imm12(&new_operands, 0b011, 19)
+        }
+        "snez" => {
+            let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
+            format_rd_rs1_rs2(&new_operands, 0b011, 0b0000000, 51)
+        }
+        "sltz" => {
+            let new_operands = vec![operands[0].clone(), operands[1].clone(), String::from("x0")];
+            format_rd_rs1_rs2(&new_operands, 0b010, 0b0000000, 51)
+        }
+        "sgtz" => {
+            let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
+            format_rd_rs1_rs2(&new_operands, 0b010, 0b0000000, 51)
+        }
+        "beqz" => {
+            let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
+            format_rs1_rs2_label(&new_operands, 0b000, 99, current_address, label_address_map)
+        }
+        "bnez" => {
+            let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
+            format_rs1_rs2_label(&new_operands, 0b001, 99, current_address, label_address_map)
+        }
+        "blez" => {
+            let new_operands = vec![String::from("x0"), operands[0].clone(), operands[1].clone()];
+            format_rs1_rs2_label(&new_operands, 0b101, 99, current_address, label_address_map)
+        }
+        "bgez" => {
+            let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
+            format_rs1_rs2_label(&new_operands, 0b101, 99, current_address, label_address_map)
+        }
+        "bltz" => {
+            let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
+            format_rs1_rs2_label(&new_operands, 0b100, 99, current_address, label_address_map)
+        }
+        "bgtz" => {
+            let new_operands = vec![String::from("x0"), operands[0].clone(), operands[1].clone()];
+            format_rs1_rs2_label(&new_operands, 0b100, 99, current_address, label_address_map)
+        }
+        "ble" => {
+            let new_operands = vec![
+                operands[1].clone(),
+                operands[0].clone(),
+                operands[2].clone(),
+            ];
+            format_rs1_rs2_label(&new_operands, 0b101, 99, current_address, label_address_map)
         }
         "bgt" => {
             let new_operands = vec![
@@ -463,8 +603,32 @@ fn instruction_to_binary(
             ];
             format_rs1_rs2_label(&new_operands, 0b100, 99, current_address, label_address_map)
         }
+        "bleu" => {
+            let new_operands = vec![
+                operands[1].clone(),
+                operands[0].clone(),
+                operands[2].clone(),
+            ];
+            format_rs1_rs2_label(&new_operands, 0b111, 99, current_address, label_address_map)
+        }
+        "bgtu" => {
+            let new_operands = vec![
+                operands[1].clone(),
+                operands[0].clone(),
+                operands[2].clone(),
+            ];
+            format_rs1_rs2_label(&new_operands, 0b110, 99, current_address, label_address_map)
+        }
+        "j" => {
+            let new_operands = vec![String::from("x0"), operands[0].clone()];
+            format_rd_label(&new_operands, 111, current_address, label_address_map)
+        }
         "jr" => {
             let new_operands = vec![String::from("x0"), operands[0].clone(), String::from("0")];
+            format_rd_rs1_imm12(&new_operands, 0b000, 103)
+        }
+        "ret" => {
+            let new_operands = vec![String::from("x0"), String::from("ra"), String::from("0")];
             format_rd_rs1_imm12(&new_operands, 0b000, 103)
         }
         "call" => {
