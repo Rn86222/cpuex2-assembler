@@ -427,6 +427,7 @@ fn instruction_to_binary(
         "divu" => format_rd_rs1_rs2(operands, 0b101, 0b0000001, 51),
         "rem" => format_rd_rs1_rs2(operands, 0b110, 0b0000001, 51),
         "remu" => format_rd_rs1_rs2(operands, 0b111, 0b0000001, 51),
+        // pseudo-instructions
         "mv" => {
             let mut new_operands = operands.clone();
             new_operands.push(String::from("0"));
@@ -471,6 +472,18 @@ fn instruction_to_binary(
             let new_operands = vec![String::from("ra"), operands[0].clone()];
             format_rd_label(&new_operands, 111, current_address, label_address_map)
         }
+        // additional instructions
+        "absdiff" => format_rd_rs1_rs2(operands, 0b000, 0b0110000, 51),
+        "abs" => {
+            let new_operands = vec![operands[0].clone(), operands[1].clone(), String::from("x0")];
+            format_fd_fs1_fs2(&new_operands, 0b000, 0b0110000, 51)
+        }
+        "swapw" => format_rd_rs1_rs2(operands, 0b000, 0b0000000, 52),
+        "swaph" => format_rd_rs1_rs2(operands, 0b001, 0b0000000, 52),
+        "swapb" => format_rd_rs1_rs2(operands, 0b010, 0b0000000, 52),
+        "notxor" => format_rd_rs1_rs2(operands, 0b100, 0b0000011, 51),
+        "notor" => format_rd_rs1_rs2(operands, 0b100, 0b0000100, 51),
+        "andnot" => format_rd_rs1_rs2(operands, 0b100, 0b0000101, 51),
         _ => String::from("???"),
     }
 }
