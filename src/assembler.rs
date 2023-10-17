@@ -731,6 +731,8 @@ pub fn assemble(path: &str, verbose: &str) {
                                         println!("{:>032b}", num);
                                     } else if verbose == "16" {
                                         println!("{:>08x}", num);
+                                    } else if verbose == "ram" {
+                                        println!("RAM[{}] <= 32'b{:>032b};", line_count, num);
                                     } else {
                                         print!(
                                             "{}{}{}{}",
