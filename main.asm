@@ -1,3 +1,5 @@
+.data
+.text
 main:
         addi    sp, sp, -32
         sw      ra, 28(sp)

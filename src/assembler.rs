@@ -73,7 +73,7 @@ fn format_int_register(reg: &String) -> String {
                 }
                 _ => {
                     let index = u8::from_str_radix(&reg, 10).unwrap();
-                    assert!(index < 31);
+                    assert!(index <= 31);
                     format!("{:>05b}", index)
                 }
             }
@@ -425,17 +425,83 @@ fn format_fs2_imm12rs1(operands: &Vec<String>, funct3: u8, op: u8) -> String {
     format!("{}{:>07b}", fs2_imm12rs1(operands, funct3), op)
 }
 
+fn resolve_load_address_symbol(
+    data_label_address_map: &HashMap<String, (usize, u32)>,
+    operands: &Vec<String>,
+    funct3: u8,
+    op: u8,
+) -> String {
+    let (imm, _) = *data_label_address_map.get(&operands[1]).unwrap();
+    let mut first_new_operands = vec![operands[0].clone()];
+    let second_new_operands = vec![
+        operands[0].clone(),
+        format!("{}({})", (imm & 4095), operands[0].clone()),
+    ];
+    if (imm & 4095) & (1 << 11) != 0 {
+        first_new_operands.push(((imm >> 12) + 1).to_string());
+    } else {
+        first_new_operands.push((imm >> 12).to_string());
+    }
+    let first = format_rd_upimm20(&first_new_operands, 23);
+    let second = format_rd_imm12rs1(&second_new_operands, funct3, op);
+    format!("{}\n{}", first, second)
+}
+
+fn resolve_store_address_symbol(
+    data_label_address_map: &HashMap<String, (usize, u32)>,
+    operands: &Vec<String>,
+    funct3: u8,
+    op: u8,
+) -> String {
+    let (imm, _) = *data_label_address_map.get(&operands[1]).unwrap();
+    let mut first_new_operands = vec![operands[2].clone()];
+    let second_new_operands = vec![
+        operands[0].clone(),
+        format!("{}({})", (imm & 4095), operands[2].clone()),
+    ];
+    if (imm & 4095) & (1 << 11) != 0 {
+        first_new_operands.push(((imm >> 12) + 1).to_string());
+    } else {
+        first_new_operands.push((imm >> 12).to_string());
+    }
+    let first = format_rd_upimm20(&first_new_operands, 23);
+    let second = format_rs2_imm12rs1(&second_new_operands, funct3, op);
+    format!("{}\n{}", first, second)
+}
+
 fn instruction_to_binary(
     inst: Instruction,
     current_address: usize,
-    label_address_map: &HashMap<String, usize>,
+    text_label_address_map: &HashMap<String, usize>,
+    data_label_address_map: &HashMap<String, (usize, u32)>,
 ) -> String {
     let name: &str = &inst.name;
     let operands = &inst.operands;
     match name {
-        "lb" => format_rd_imm12rs1(operands, 0b000, 3),
-        "lh" => format_rd_imm12rs1(operands, 0b001, 3),
-        "lw" => format_rd_imm12rs1(operands, 0b010, 3),
+        "lb" => {
+            assert_eq!(operands.len(), 2);
+            if operands[1].find('(') == None {
+                resolve_load_address_symbol(data_label_address_map, operands, 0b000, 3)
+            } else {
+                format_rd_imm12rs1(operands, 0b000, 3)
+            }
+        }
+        "lh" => {
+            assert_eq!(operands.len(), 2);
+            if operands[1].find('(') == None {
+                resolve_load_address_symbol(data_label_address_map, operands, 0b001, 3)
+            } else {
+                format_rd_imm12rs1(operands, 0b001, 3)
+            }
+        }
+        "lw" => {
+            assert_eq!(operands.len(), 2);
+            if operands[1].find('(') == None {
+                resolve_load_address_symbol(data_label_address_map, operands, 0b010, 3)
+            } else {
+                format_rd_imm12rs1(operands, 0b010, 3)
+            }
+        }
         "lbu" => format_rd_imm12rs1(operands, 0b100, 3),
         "lhu" => format_rd_imm12rs1(operands, 0b101, 3),
         "addi" => format_rd_rs1_imm12(operands, 0b000, 19),
@@ -448,9 +514,27 @@ fn instruction_to_binary(
         "ori" => format_rd_rs1_imm12(operands, 0b110, 19),
         "andi" => format_rd_rs1_imm12(operands, 0b111, 19),
         "auipc" => format_rd_upimm20(operands, 23),
-        "sb" => format_rs2_imm12rs1(operands, 0b000, 35),
-        "sh" => format_rs2_imm12rs1(operands, 0b001, 35),
-        "sw" => format_rs2_imm12rs1(operands, 0b010, 35),
+        "sb" => {
+            if operands.len() == 3 && operands[2].find('(') == None {
+                resolve_store_address_symbol(data_label_address_map, operands, 0b000, 35)
+            } else {
+                format_rs2_imm12rs1(operands, 0b000, 35)
+            }
+        }
+        "sh" => {
+            if operands.len() == 3 && operands[2].find('(') == None {
+                resolve_store_address_symbol(data_label_address_map, operands, 0b001, 35)
+            } else {
+                format_rs2_imm12rs1(operands, 0b001, 35)
+            }
+        }
+        "sw" => {
+            if operands.len() == 3 && operands[2].find('(') == None {
+                resolve_store_address_symbol(data_label_address_map, operands, 0b010, 35)
+            } else {
+                format_rs2_imm12rs1(operands, 0b010, 35)
+            }
+        }
         "add" => format_rd_rs1_rs2(operands, 0b000, 0b0000000, 51),
         "sub" => format_rd_rs1_rs2(operands, 0b000, 0b0100000, 51),
         "sll" => format_rd_rs1_rs2(operands, 0b001, 0b0000000, 51),
@@ -462,14 +546,18 @@ fn instruction_to_binary(
         "or" => format_rd_rs1_rs2(operands, 0b110, 0b0000000, 51),
         "and" => format_rd_rs1_rs2(operands, 0b111, 0b0000000, 51),
         "lui" => format_rd_upimm20(operands, 55),
-        "beq" => format_rs1_rs2_label(operands, 0b000, 99, current_address, label_address_map),
-        "bne" => format_rs1_rs2_label(operands, 0b001, 99, current_address, label_address_map),
-        "blt" => format_rs1_rs2_label(operands, 0b100, 99, current_address, label_address_map),
-        "bge" => format_rs1_rs2_label(operands, 0b101, 99, current_address, label_address_map),
-        "bltu" => format_rs1_rs2_label(operands, 0b110, 99, current_address, label_address_map),
-        "bgeu" => format_rs1_rs2_label(operands, 0b111, 99, current_address, label_address_map),
+        "beq" => format_rs1_rs2_label(operands, 0b000, 99, current_address, text_label_address_map),
+        "bne" => format_rs1_rs2_label(operands, 0b001, 99, current_address, text_label_address_map),
+        "blt" => format_rs1_rs2_label(operands, 0b100, 99, current_address, text_label_address_map),
+        "bge" => format_rs1_rs2_label(operands, 0b101, 99, current_address, text_label_address_map),
+        "bltu" => {
+            format_rs1_rs2_label(operands, 0b110, 99, current_address, text_label_address_map)
+        }
+        "bgeu" => {
+            format_rs1_rs2_label(operands, 0b111, 99, current_address, text_label_address_map)
+        }
         "jalr" => format_rd_rs1_imm12(operands, 0b000, 103),
-        "jal" => format_rd_label(operands, 111, current_address, label_address_map),
+        "jal" => format_rd_label(operands, 111, current_address, text_label_address_map),
         // TODO: how to decide rounding mode? (funct3)
         // TODO: how to decide floating point format? (funct7)
         "fmadd" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 67),
@@ -565,27 +653,63 @@ fn instruction_to_binary(
         }
         "beqz" => {
             let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
-            format_rs1_rs2_label(&new_operands, 0b000, 99, current_address, label_address_map)
+            format_rs1_rs2_label(
+                &new_operands,
+                0b000,
+                99,
+                current_address,
+                text_label_address_map,
+            )
         }
         "bnez" => {
             let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
-            format_rs1_rs2_label(&new_operands, 0b001, 99, current_address, label_address_map)
+            format_rs1_rs2_label(
+                &new_operands,
+                0b001,
+                99,
+                current_address,
+                text_label_address_map,
+            )
         }
         "blez" => {
             let new_operands = vec![String::from("x0"), operands[0].clone(), operands[1].clone()];
-            format_rs1_rs2_label(&new_operands, 0b101, 99, current_address, label_address_map)
+            format_rs1_rs2_label(
+                &new_operands,
+                0b101,
+                99,
+                current_address,
+                text_label_address_map,
+            )
         }
         "bgez" => {
             let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
-            format_rs1_rs2_label(&new_operands, 0b101, 99, current_address, label_address_map)
+            format_rs1_rs2_label(
+                &new_operands,
+                0b101,
+                99,
+                current_address,
+                text_label_address_map,
+            )
         }
         "bltz" => {
             let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
-            format_rs1_rs2_label(&new_operands, 0b100, 99, current_address, label_address_map)
+            format_rs1_rs2_label(
+                &new_operands,
+                0b100,
+                99,
+                current_address,
+                text_label_address_map,
+            )
         }
         "bgtz" => {
             let new_operands = vec![String::from("x0"), operands[0].clone(), operands[1].clone()];
-            format_rs1_rs2_label(&new_operands, 0b100, 99, current_address, label_address_map)
+            format_rs1_rs2_label(
+                &new_operands,
+                0b100,
+                99,
+                current_address,
+                text_label_address_map,
+            )
         }
         "ble" => {
             let new_operands = vec![
@@ -593,7 +717,13 @@ fn instruction_to_binary(
                 operands[0].clone(),
                 operands[2].clone(),
             ];
-            format_rs1_rs2_label(&new_operands, 0b101, 99, current_address, label_address_map)
+            format_rs1_rs2_label(
+                &new_operands,
+                0b101,
+                99,
+                current_address,
+                text_label_address_map,
+            )
         }
         "bgt" => {
             let new_operands = vec![
@@ -601,7 +731,13 @@ fn instruction_to_binary(
                 operands[0].clone(),
                 operands[2].clone(),
             ];
-            format_rs1_rs2_label(&new_operands, 0b100, 99, current_address, label_address_map)
+            format_rs1_rs2_label(
+                &new_operands,
+                0b100,
+                99,
+                current_address,
+                text_label_address_map,
+            )
         }
         "bleu" => {
             let new_operands = vec![
@@ -609,7 +745,13 @@ fn instruction_to_binary(
                 operands[0].clone(),
                 operands[2].clone(),
             ];
-            format_rs1_rs2_label(&new_operands, 0b111, 99, current_address, label_address_map)
+            format_rs1_rs2_label(
+                &new_operands,
+                0b111,
+                99,
+                current_address,
+                text_label_address_map,
+            )
         }
         "bgtu" => {
             let new_operands = vec![
@@ -617,11 +759,17 @@ fn instruction_to_binary(
                 operands[0].clone(),
                 operands[2].clone(),
             ];
-            format_rs1_rs2_label(&new_operands, 0b110, 99, current_address, label_address_map)
+            format_rs1_rs2_label(
+                &new_operands,
+                0b110,
+                99,
+                current_address,
+                text_label_address_map,
+            )
         }
         "j" => {
             let new_operands = vec![String::from("x0"), operands[0].clone()];
-            format_rd_label(&new_operands, 111, current_address, label_address_map)
+            format_rd_label(&new_operands, 111, current_address, text_label_address_map)
         }
         "jr" => {
             let new_operands = vec![String::from("x0"), operands[0].clone(), String::from("0")];
@@ -634,7 +782,21 @@ fn instruction_to_binary(
         "call" => {
             // TODO: call far function
             let new_operands = vec![String::from("ra"), operands[0].clone()];
-            format_rd_label(&new_operands, 111, current_address, label_address_map)
+            format_rd_label(&new_operands, 111, current_address, text_label_address_map)
+        }
+        "la" => {
+            let (imm, _) = *data_label_address_map.get(&operands[1]).unwrap();
+            let mut first_new_operands = vec![String::from("ra")];
+            let mut second_new_operands = vec![operands[0].clone(), operands[0].clone()];
+            second_new_operands.push((imm & 4095).to_string());
+            if (imm & 4095) & (1 << 11) != 0 {
+                first_new_operands.push(((imm >> 12) + 1).to_string());
+            } else {
+                first_new_operands.push((imm >> 12).to_string());
+            }
+            let first = format_rd_upimm20(&first_new_operands, 23);
+            let second = format_rd_rs1_imm12(&second_new_operands, 0b000, 19);
+            format!("{}\n{}", first, second)
         }
         // additional instructions
         "absdiff" => format_rd_rs1_rs2(operands, 0b000, 0b0110000, 51),
@@ -665,11 +827,27 @@ fn line_count_of(inst: Instruction) -> usize {
                 2
             }
         }
+        "la" => 2,
+        "lb" | "lh" | "lw" => {
+            assert_eq!(operands.len(), 2);
+            if operands[1].find('(') == None {
+                2
+            } else {
+                1
+            }
+        }
+        "sb" | "sh" | "sw" => {
+            if operands.len() == 3 && operands[2].find('(') == None {
+                2
+            } else {
+                1
+            }
+        }
         _ => 1,
     }
 }
 
-fn create_label_address_map(path: &str) -> HashMap<String, usize> {
+fn create_text_label_address_map(path: &str) -> HashMap<String, usize> {
     let mut label_address_map: HashMap<String, usize> = HashMap::new();
     match File::open(path) {
         Err(e) => {
@@ -678,19 +856,29 @@ fn create_label_address_map(path: &str) -> HashMap<String, usize> {
         Ok(file) => {
             let reader = BufReader::new(file);
             let mut line_count = 0;
+            let mut in_text_section = false;
             for line in reader.lines() {
                 let mut line = line.unwrap();
-                if line.ends_with(":") {
-                    line.pop();
-                    label_address_map.insert(line, line_count * 4);
-                } else if line.len() != 0 {
-                    match parse_instruction(&line) {
-                        None => {
-                            line_count += 1;
+                if in_text_section {
+                    if line == ".data" {
+                        break;
+                    }
+                    if line.ends_with(":") {
+                        line.pop();
+                        label_address_map.insert(line, line_count * 4);
+                    } else if line.len() != 0 {
+                        match parse_instruction(&line) {
+                            None => {
+                                line_count += 1;
+                            }
+                            Some(inst) => {
+                                line_count += line_count_of(inst);
+                            }
                         }
-                        Some(inst) => {
-                            line_count += line_count_of(inst);
-                        }
+                    }
+                } else {
+                    if line == ".text" {
+                        in_text_section = true;
                     }
                 }
             }
@@ -699,8 +887,89 @@ fn create_label_address_map(path: &str) -> HashMap<String, usize> {
     label_address_map
 }
 
+enum State {
+    None,
+    InTextSection,
+    InDataSection,
+    FindingVariableValue((String, usize)),
+}
+
+fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u32)> {
+    let mut label_address_map: HashMap<String, (usize, u32)> = HashMap::new();
+    match File::open(path) {
+        Err(e) => {
+            println!("Failed in opening file ({}).", e);
+        }
+        Ok(file) => {
+            let mut state = State::None;
+            let reader = BufReader::new(file);
+            let mut variable_count = 0;
+            for line in reader.lines() {
+                let mut line = line.unwrap();
+                match state {
+                    State::None => {
+                        if line == ".data" {
+                            state = State::InDataSection;
+                        } else if line == ".text" {
+                            state = State::InTextSection;
+                        }
+                    }
+                    State::InTextSection => {
+                        if line == ".data" {
+                            state = State::InDataSection;
+                        }
+                    }
+                    State::InDataSection => {
+                        if line.ends_with(":") {
+                            line.pop();
+                            state = State::FindingVariableValue((line, variable_count * 4));
+                            variable_count += 1;
+                        } else if line == ".text" {
+                            break;
+                        }
+                    }
+                    State::FindingVariableValue((name, address)) => {
+                        let splited_line = line.split_whitespace().collect::<Vec<&str>>();
+                        assert_eq!(splited_line.len(), 2);
+                        assert_eq!(splited_line[0], ".long");
+                        let mut value_str = splited_line[1].to_string();
+                        if value_str.starts_with("0x") {
+                            value_str = value_str[2..].to_string();
+                        }
+                        let value = u32::from_str_radix(&value_str, 16).unwrap();
+                        label_address_map.insert(name.clone(), (address, value));
+                        state = State::InDataSection;
+                    }
+                }
+            }
+        }
+    }
+    label_address_map
+}
+
+fn section_exists(path: &str) -> bool {
+    match File::open(path) {
+        Err(e) => {
+            println!("Failed in opening file ({}).", e);
+            panic!();
+        }
+        Ok(file) => {
+            let reader = BufReader::new(file);
+            for line in reader.lines() {
+                let line = line.unwrap();
+                if line == ".text" {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+}
+
 pub fn assemble(path: &str, verbose: &str) {
-    let label_address_map = create_label_address_map(path);
+    let text_label_address_map = create_text_label_address_map(path);
+    let data_label_address_value_map = create_data_label_address_value_map(path);
+    let section_exists = section_exists(path);
     match File::open(path) {
         Err(e) => {
             println!("Failed in opening file ({}).", e);
@@ -708,41 +977,55 @@ pub fn assemble(path: &str, verbose: &str) {
         Ok(file) => {
             let reader = BufReader::new(file);
             let mut line_count = 0;
+            let mut in_text_section = !section_exists;
             for line in reader.lines() {
-                let line = line.unwrap();
-                if line.ends_with(":") {
-                    continue;
+                let line = line.unwrap().trim().to_string();
+                if !in_text_section {
+                    if line == ".text" {
+                        in_text_section = true;
+                    }
                 } else {
-                    let inst = parse_instruction(&line);
-                    match inst {
-                        None => {}
-                        Some(inst) => {
-                            let binary_lines =
-                                instruction_to_binary(inst, line_count * 4, &label_address_map);
-                            let binary_lines: Vec<&str> = binary_lines.split('\n').collect();
-                            for binary in binary_lines {
-                                if binary == "???" {
-                                    print!("\0\0\0\0");
-                                    eprintln!("unexpected instruction: {}", line);
-                                    line_count += 1;
-                                } else {
-                                    let num: u32 = u32::from_str_radix(binary, 2).unwrap();
-                                    if verbose == "2" {
-                                        println!("{:>032b}", num);
-                                    } else if verbose == "16" {
-                                        println!("{:>08x}", num);
-                                    } else if verbose == "ram" {
-                                        println!("RAM[{}] <= 32'b{:>032b};", line_count, num);
+                    if line == ".data" {
+                        break;
+                    }
+                    if line.ends_with(":") {
+                        continue;
+                    } else {
+                        let inst = parse_instruction(&line);
+                        match inst {
+                            None => {}
+                            Some(inst) => {
+                                let binary_lines = instruction_to_binary(
+                                    inst,
+                                    line_count * 4,
+                                    &text_label_address_map,
+                                    &data_label_address_value_map,
+                                );
+                                let binary_lines: Vec<&str> = binary_lines.split('\n').collect();
+                                for binary in binary_lines {
+                                    if binary == "???" {
+                                        print!("\0\0\0\0");
+                                        eprintln!("unexpected instruction: {}", line);
+                                        line_count += 1;
                                     } else {
-                                        print!(
-                                            "{}{}{}{}",
-                                            (num & 0xff) as u8 as char,
-                                            ((num >> 8) & 0xff) as u8 as char,
-                                            ((num >> 16) & 0xff) as u8 as char,
-                                            ((num >> 24) & 0xff) as u8 as char
-                                        );
+                                        let num: u32 = u32::from_str_radix(binary, 2).unwrap();
+                                        if verbose == "2" {
+                                            println!("{:>032b}", num);
+                                        } else if verbose == "16" {
+                                            println!("{:>08x}", num);
+                                        } else if verbose == "ram" {
+                                            println!("RAM[{}] <= 32'b{:>032b};", line_count, num);
+                                        } else {
+                                            print!(
+                                                "{}{}{}{}",
+                                                (num & 0xff) as u8 as char,
+                                                ((num >> 8) & 0xff) as u8 as char,
+                                                ((num >> 16) & 0xff) as u8 as char,
+                                                ((num >> 24) & 0xff) as u8 as char
+                                            );
+                                        }
+                                        line_count += 1;
                                     }
-                                    line_count += 1;
                                 }
                             }
                         }
