@@ -425,6 +425,19 @@ fn format_fs2_imm12rs1(operands: &Vec<String>, funct3: u8, op: u8) -> String {
     format!("{}{:>07b}", fs2_imm12rs1(operands, funct3), op)
 }
 
+fn rd(operands: &Vec<String>, funct3: u8) -> String {
+    assert_eq!(operands.len(), 1);
+    let imm = format!("{:>012}", 0);
+    let rd = format!("{:>05}", 0);
+    let rs1 = format_int_register(&operands[0]);
+    let funct3 = format!("{:>03b}", funct3);
+    format!("{}{}{}{}", imm, rs1, funct3, rd)
+}
+
+fn format_rd(operands: &Vec<String>, funct3: u8, op: u8) -> String {
+    format!("{}{:>07b}", rd(operands, funct3), op)
+}
+
 fn resolve_load_address_symbol(
     data_label_address_map: &HashMap<String, (usize, u32)>,
     operands: &Vec<String>,
@@ -581,9 +594,9 @@ fn instruction_to_binary(
         "flw" => format_fd_imm12rs1(operands, 0b010, 7),
         "fsw" => format_fs2_imm12rs1(operands, 0b010, 39),
         "fcvt.w.s" => format_rd_fs1_with_rs2(operands, 0b000, 0b1100000, 0b00000, 83),
-        "fcvt.wu.s" => format_rd_fs1_with_rs2(operands, 0b000, 0b1100000, 0b00001, 83),
+        "fcvt.wu.s" => format_rd_fs1_with_rs2(operands, 0b000, 0b1100001, 0b00000, 83),
         "fcvt.s.w" => format_fd_fs1_with_rs2(operands, 0b000, 0b1101000, 0b00000, 83),
-        "fcvt.s.wu" => format_fd_fs1_with_rs2(operands, 0b000, 0b1101000, 0b00001, 83),
+        "fcvt.s.wu" => format_fd_fs1_with_rs2(operands, 0b000, 0b1101001, 0b00000, 83),
         "fmv.x.w" => format_rd_fs1_with_rs2(operands, 0b000, 0b1110000, 0b00000, 83),
         "fmv.w.x" => format_fd_fs1_with_rs2(operands, 0b000, 0b1111000, 0b00000, 83),
         "mul" => format_rd_rs1_rs2(operands, 0b000, 0b0000001, 51),
@@ -810,6 +823,11 @@ fn instruction_to_binary(
         "notxor" => format_rd_rs1_rs2(operands, 0b100, 0b0000011, 51),
         "notor" => format_rd_rs1_rs2(operands, 0b100, 0b0000100, 51),
         "andnot" => format_rd_rs1_rs2(operands, 0b100, 0b0000101, 51),
+        "in" => format_rd(operands, 0b000, 115),
+        "outuart" => format_rd(operands, 0b100, 115),
+        "out7seg8" => format_rd(operands, 0b101, 115),
+        "out7seg1" => format_rd(operands, 0b110, 115),
+        "outled" => format_rd(operands, 0b111, 115),
         _ => String::from("???"),
     }
 }
