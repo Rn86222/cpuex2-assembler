@@ -126,29 +126,49 @@ fn format_float_register(reg: &String) -> String {
 }
 
 fn imm12(value: &String) -> String {
-    let value = i32::from_str_radix(value, 10).unwrap();
-    let formatted = format!("{:>012b}", value);
+    let value_i32;
+    if value.len() >= 2 && &value[0..2] == "0x" {
+        value_i32 = i32::from_str_radix(&value[2..], 16).unwrap();
+    } else {
+        value_i32 = i32::from_str_radix(value, 10).unwrap();
+    }
+    let formatted = format!("{:>012b}", value_i32);
     let length = formatted.len();
     formatted[length - 12..length].to_string()
 }
 
 fn imm20(value: &String) -> String {
-    let value = i32::from_str_radix(value, 10).unwrap();
-    let formatted = format!("{:>020b}", value);
+    let value_i32;
+    if value.len() >= 2 && &value[0..2] == "0x" {
+        value_i32 = i32::from_str_radix(&value[2..], 16).unwrap();
+    } else {
+        value_i32 = i32::from_str_radix(value, 10).unwrap();
+    }
+    let formatted = format!("{:>020b}", value_i32);
     let length = formatted.len();
     formatted[length - 20..length].to_string()
 }
 
 fn uimm5(value: &String) -> String {
-    let value = u32::from_str_radix(value, 10).unwrap() & 0b11111;
-    let formatted = format!("{:>05b}", value);
+    let value_u32;
+    if value.len() >= 2 && &value[0..2] == "0x" {
+        value_u32 = u32::from_str_radix(&value[2..], 16).unwrap() & 0b11111;
+    } else {
+        value_u32 = u32::from_str_radix(value, 10).unwrap() & 0b11111;
+    }
+    let formatted = format!("{:>05b}", value_u32);
     let length = formatted.len();
     formatted[length - 5..length].to_string()
 }
 
 fn upimm20(value: &String) -> String {
-    let value = i32::from_str_radix(value, 10).unwrap();
-    let formatted = format!("{:>020b}", value);
+    let value_i32;
+    if value.len() >= 2 && &value[0..2] == "0x" {
+        value_i32 = i32::from_str_radix(&value[2..], 16).unwrap();
+    } else {
+        value_i32 = i32::from_str_radix(value, 10).unwrap();
+    }
+    let formatted = format!("{:>020b}", value_i32);
     let length = formatted.len();
     formatted[length - 20..length].to_string()
 }
@@ -614,7 +634,12 @@ fn instruction_to_binary(
         }
         "li" => {
             assert_eq!(operands.len(), 2);
-            let imm = i32::from_str_radix(&operands[1], 10).unwrap();
+            let imm;
+            if operands[1].len() >= 2 && &operands[1][0..2] == "0x" {
+                imm = i32::from_str_radix(&operands[1][2..], 16).unwrap();
+            } else {
+                imm = i32::from_str_radix(&operands[1], 10).unwrap();
+            }
             if -2_i32.pow(12 - 1) <= imm && imm <= 2_i32.pow(12 - 1) {
                 let mut new_operands = vec![operands[0].clone()];
                 new_operands.push(String::from("x0"));
@@ -838,7 +863,12 @@ fn line_count_of(inst: Instruction) -> usize {
     match name {
         "li" => {
             assert_eq!(operands.len(), 2);
-            let imm = i32::from_str_radix(&operands[1], 10).unwrap();
+            let imm;
+            if operands[1].len() >= 2 && &operands[1][0..2] == "0x" {
+                imm = i32::from_str_radix(&operands[1][2..], 16).unwrap();
+            } else {
+                imm = i32::from_str_radix(&operands[1], 10).unwrap();
+            }
             if -2_i32.pow(12 - 1) <= imm && imm <= 2_i32.pow(12 - 1) {
                 1
             } else {
