@@ -23,7 +23,8 @@ fn parse_instruction(line: &str) -> Option<Instruction> {
         name = line[0..index].to_string();
         operands_line = &line[index..];
     } else {
-        return None;
+        name = line.to_string();
+        operands_line = "";
     }
     let splited: Vec<&str> = operands_line.split(',').collect();
 
@@ -1041,7 +1042,9 @@ pub fn assemble(path: &str, verbose: &str) {
                     } else {
                         let inst = parse_instruction(&line);
                         match inst {
-                            None => {}
+                            None => {
+                                println!("paser error: {}", line);
+                            }
                             Some(inst) => {
                                 let binary_lines = instruction_to_binary(
                                     inst,
