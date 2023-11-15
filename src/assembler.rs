@@ -95,7 +95,7 @@ fn format_float_register(reg: &String) -> String {
             if index <= 7 {
                 format!("{:>05b}", index)
             } else {
-                assert!(8 <= index && index <= 7);
+                assert!(8 <= index && index <= 11);
                 format!("{:>05b}", index + 20)
             }
         }
@@ -120,7 +120,7 @@ fn format_float_register(reg: &String) -> String {
         _ => {
             reg.remove(0);
             let index = u8::from_str_radix(&reg, 10).unwrap();
-            assert!(index < 31);
+            assert!(index <= 31);
             format!("{:>05b}", index)
         }
     }
@@ -896,7 +896,7 @@ fn line_count_of(inst: Instruction) -> usize {
     }
 }
 
-fn create_text_label_address_map(path: &str) -> HashMap<String, usize> {
+fn create_text_label_address_map(path: &str, section_exists: bool) -> HashMap<String, usize> {
     let mut label_address_map: HashMap<String, usize> = HashMap::new();
     match File::open(path) {
         Err(e) => {
@@ -905,7 +905,7 @@ fn create_text_label_address_map(path: &str) -> HashMap<String, usize> {
         Ok(file) => {
             let reader = BufReader::new(file);
             let mut line_count = 0;
-            let mut in_text_section = false;
+            let mut in_text_section = !section_exists;
             for line in reader.lines() {
                 let mut line = line.unwrap();
                 if in_text_section {
@@ -1016,9 +1016,9 @@ fn section_exists(path: &str) -> bool {
 }
 
 pub fn assemble(path: &str, verbose: &str) {
-    let text_label_address_map = create_text_label_address_map(path);
-    let data_label_address_value_map = create_data_label_address_value_map(path);
     let section_exists = section_exists(path);
+    let text_label_address_map = create_text_label_address_map(path, section_exists);
+    let data_label_address_value_map = create_data_label_address_value_map(path);
     match File::open(path) {
         Err(e) => {
             println!("Failed in opening file ({}).", e);
