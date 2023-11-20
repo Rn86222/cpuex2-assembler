@@ -63,7 +63,7 @@ fib:
         addi    sp, sp, 32
         jr      ra
 ```
-You can use the following command to assemble `main.asm` and output the result in hexadecimal number.
+You can use the following command to assemble the `main.asm` above and output the result in hexadecimal number.
 ```
 cargo run -- -f main.asm -s 16
 ```
