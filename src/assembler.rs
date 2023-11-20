@@ -1017,7 +1017,7 @@ fn section_exists(path: &str) -> bool {
     }
 }
 
-pub fn assemble(path: &str, verbose: &str) {
+pub fn assemble(path: &str, style: &str) {
     let section_exists = section_exists(path);
     let text_label_address_map = create_text_label_address_map(path, section_exists);
     let data_label_address_value_map = create_data_label_address_value_map(path);
@@ -1030,7 +1030,7 @@ pub fn assemble(path: &str, verbose: &str) {
             let out_file_name = path
                 .trim_end_matches(path.split('.').last().unwrap_or(""))
                 .to_owned()
-                + verbose;
+                + style;
             let mut out_file = File::create(out_file_name).unwrap();
             let reader = BufReader::new(file);
             let mut line_count = 0;
@@ -1069,15 +1069,15 @@ pub fn assemble(path: &str, verbose: &str) {
                                         line_count += 1;
                                     } else {
                                         let num: u32 = u32::from_str_radix(binary, 2).unwrap();
-                                        if verbose == "2" {
+                                        if style == "2" {
                                             out_file
                                                 .write_fmt(format_args!("{:>032b}\n", num))
                                                 .unwrap();
-                                        } else if verbose == "16" {
+                                        } else if style == "16" {
                                             out_file
                                                 .write_fmt(format_args!("{:>08x}\n", num))
                                                 .unwrap();
-                                        } else if verbose == "ram" {
+                                        } else if style == "ram" {
                                             out_file
                                                 .write_fmt(format_args!(
                                                     "RAM[{}] <= 32'b{:>032b};\n",

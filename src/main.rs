@@ -1,13 +1,21 @@
 use assembler::*;
-use std::env;
 mod assembler;
+use clap::Parser;
+
+/// Assembler for CPUEX-Group2 computer
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Name of the input file
+    #[arg(short, long, default_value = "main.asm")]
+    file: Option<String>,
+
+    /// Style of output: '2', '16', 'ram', or 'bin'
+    #[arg(short, long, default_value = "ram")]
+    style: Option<String>,
+}
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let argc = args.len();
-    if argc >= 3 {
-        assemble(&args[2], &args[1]);
-    } else {
-        assemble("main.asm", "ram");
-    }
+    let args = Args::parse();
+    assemble(&args.file.unwrap(), &args.style.unwrap());
 }

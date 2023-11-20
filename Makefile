@@ -1,11 +1,11 @@
 bin:
-	cargo run -- bin main.asm
+	cargo run -- --file main.asm --style bin
 
 2:
-	cargo run -- 2 main.asm
+	cargo run -- --file main.asm --style 2
 
 16:
-	cargo run -- 16 main.asm
+	cargo run -- --file main.asm --style 16
 
 ram:
-	cargo run -- ram main.asm
+	cargo run -- --file main.asm --style asm
