@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Write},
 };
 
 struct Instruction {
@@ -901,6 +901,7 @@ fn create_text_label_address_map(path: &str, section_exists: bool) -> HashMap<St
     match File::open(path) {
         Err(e) => {
             println!("Failed in opening file ({}).", e);
+            panic!();
         }
         Ok(file) => {
             let reader = BufReader::new(file);
@@ -948,6 +949,7 @@ fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u3
     match File::open(path) {
         Err(e) => {
             println!("Failed in opening file ({}).", e);
+            panic!();
         }
         Ok(file) => {
             let mut state = State::None;
@@ -1022,8 +1024,11 @@ pub fn assemble(path: &str, verbose: &str) {
     match File::open(path) {
         Err(e) => {
             println!("Failed in opening file ({}).", e);
+            panic!();
         }
         Ok(file) => {
+            let out_file_name = path.split('.').collect::<Vec<&str>>()[0].to_string() + ".bin";
+            let mut out_file = File::create(out_file_name).unwrap();
             let reader = BufReader::new(file);
             let mut line_count = 0;
             let mut in_text_section = !section_exists;
@@ -1044,6 +1049,7 @@ pub fn assemble(path: &str, verbose: &str) {
                         match inst {
                             None => {
                                 println!("paser error: {}", line);
+                                panic!();
                             }
                             Some(inst) => {
                                 let binary_lines = instruction_to_binary(
@@ -1067,13 +1073,13 @@ pub fn assemble(path: &str, verbose: &str) {
                                         } else if verbose == "ram" {
                                             println!("RAM[{}] <= 32'b{:>032b};", line_count, num);
                                         } else {
-                                            print!(
-                                                "{}{}{}{}",
-                                                (num & 0xff) as u8 as char,
-                                                ((num >> 8) & 0xff) as u8 as char,
-                                                ((num >> 16) & 0xff) as u8 as char,
-                                                ((num >> 24) & 0xff) as u8 as char
-                                            );
+                                            let bytes_to_write: [u8; 4] = [
+                                                (num & 0xff) as u8,
+                                                ((num >> 8) & 0xff) as u8,
+                                                ((num >> 16) & 0xff) as u8,
+                                                ((num >> 24) & 0xff) as u8,
+                                            ];
+                                            out_file.write_all(&bytes_to_write).unwrap();
                                         }
                                         line_count += 1;
                                     }
