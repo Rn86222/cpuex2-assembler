@@ -1027,7 +1027,10 @@ pub fn assemble(path: &str, verbose: &str) {
             panic!();
         }
         Ok(file) => {
-            let out_file_name = path.split('.').collect::<Vec<&str>>()[0].to_string() + ".bin";
+            let out_file_name = path
+                .trim_end_matches(path.split('.').last().unwrap_or(""))
+                .to_owned()
+                + verbose;
             let mut out_file = File::create(out_file_name).unwrap();
             let reader = BufReader::new(file);
             let mut line_count = 0;
@@ -1067,11 +1070,20 @@ pub fn assemble(path: &str, verbose: &str) {
                                     } else {
                                         let num: u32 = u32::from_str_radix(binary, 2).unwrap();
                                         if verbose == "2" {
-                                            println!("{:>032b}", num);
+                                            out_file
+                                                .write_fmt(format_args!("{:>032b}\n", num))
+                                                .unwrap();
                                         } else if verbose == "16" {
-                                            println!("{:>08x}", num);
+                                            out_file
+                                                .write_fmt(format_args!("{:>08x}\n", num))
+                                                .unwrap();
                                         } else if verbose == "ram" {
-                                            println!("RAM[{}] <= 32'b{:>032b};", line_count, num);
+                                            out_file
+                                                .write_fmt(format_args!(
+                                                    "RAM[{}] <= 32'b{:>032b};\n",
+                                                    line_count, num
+                                                ))
+                                                .unwrap();
                                         } else {
                                             let bytes_to_write: [u8; 4] = [
                                                 (num & 0xff) as u8,
