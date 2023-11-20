@@ -2,7 +2,7 @@ use assembler::*;
 mod assembler;
 use clap::Parser;
 
-/// Assembler for CPUEX-Group2 computer
+/// Assembler for 2023 CPU-Ex Group2
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {

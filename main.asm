@@ -1,8 +1,8 @@
 .data
 .text
 main:
-        addi    sp, sp, -32
-        sw      ra, 28(sp)
+        addi    sp, sp, -32 # this is comment
+        sw      ra, 28(sp) ; this is also comment
         sw      s0, 24(sp)
         addi    s0, sp, 32
         li      a0, 8
@@ -14,6 +14,7 @@ main:
         lw      s0, 24(sp)
         addi    sp, sp, 32
         jr      ra
+# empty line is allowed
 fib:
         addi    sp, sp, -32
         sw      ra, 28(sp)
