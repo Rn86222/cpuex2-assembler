@@ -10,13 +10,6 @@ struct Instruction {
 }
 
 fn parse_instruction(line: &str) -> Option<Instruction> {
-    let no_comment_line;
-    if let Some(index) = line.find('#') {
-        no_comment_line = &line[0..index];
-    } else {
-        no_comment_line = line;
-    }
-    let line = no_comment_line.trim();
     let name;
     let operands_line;
     if let Some(index) = line.find(' ') {
@@ -896,19 +889,35 @@ fn line_count_of(inst: Instruction) -> usize {
     }
 }
 
+fn remove_after_hash_or_semicolon(input: String) -> String {
+    if let Some(index) = input.find('#') {
+        let result = input[..index].to_string();
+        return result;
+    }
+    if let Some(index) = input.find(';') {
+        let result = input[..index].to_string();
+        return result;
+    }
+    input
+}
+
 fn create_text_label_address_map(path: &str, section_exists: bool) -> HashMap<String, usize> {
     let mut label_address_map: HashMap<String, usize> = HashMap::new();
     match File::open(path) {
         Err(e) => {
-            println!("Failed in opening file ({}).", e);
-            panic!();
+            panic!("Failed in opening file ({}).", e);
         }
         Ok(file) => {
             let reader = BufReader::new(file);
             let mut line_count = 0;
             let mut in_text_section = !section_exists;
             for line in reader.lines() {
-                let mut line = line.unwrap();
+                let mut line = remove_after_hash_or_semicolon(line.unwrap())
+                    .trim()
+                    .to_string();
+                if line.len() == 0 {
+                    continue;
+                }
                 if in_text_section {
                     if line == ".data" {
                         break;
@@ -916,7 +925,7 @@ fn create_text_label_address_map(path: &str, section_exists: bool) -> HashMap<St
                     if line.ends_with(":") {
                         line.pop();
                         label_address_map.insert(line, line_count * 4);
-                    } else if line.len() != 0 {
+                    } else {
                         match parse_instruction(&line) {
                             None => {
                                 line_count += 1;
@@ -948,15 +957,19 @@ fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u3
     let mut label_address_map: HashMap<String, (usize, u32)> = HashMap::new();
     match File::open(path) {
         Err(e) => {
-            println!("Failed in opening file ({}).", e);
-            panic!();
+            panic!("Failed in opening file ({}).", e);
         }
         Ok(file) => {
             let mut state = State::None;
             let reader = BufReader::new(file);
             let mut variable_count = 0;
             for line in reader.lines() {
-                let mut line = line.unwrap();
+                let mut line = remove_after_hash_or_semicolon(line.unwrap())
+                    .trim()
+                    .to_string();
+                if line.len() == 0 {
+                    continue;
+                }
                 match state {
                     State::None => {
                         if line == ".data" {
@@ -1001,13 +1014,17 @@ fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u3
 fn section_exists(path: &str) -> bool {
     match File::open(path) {
         Err(e) => {
-            println!("Failed in opening file ({}).", e);
-            panic!();
+            panic!("Failed in opening file ({}).", e);
         }
         Ok(file) => {
             let reader = BufReader::new(file);
             for line in reader.lines() {
-                let line = line.unwrap();
+                let line = remove_after_hash_or_semicolon(line.unwrap())
+                    .trim()
+                    .to_string();
+                if line.len() == 0 {
+                    continue;
+                }
                 if line == ".text" {
                     return true;
                 }
@@ -1023,8 +1040,7 @@ pub fn assemble(path: &str, style: &str) {
     let data_label_address_value_map = create_data_label_address_value_map(path);
     match File::open(path) {
         Err(e) => {
-            println!("Failed in opening file ({}).", e);
-            panic!();
+            panic!("Failed in opening file ({}).", e);
         }
         Ok(file) => {
             let out_file_name = path
@@ -1036,7 +1052,12 @@ pub fn assemble(path: &str, style: &str) {
             let mut line_count = 0;
             let mut in_text_section = !section_exists;
             for line in reader.lines() {
-                let line = line.unwrap().trim().to_string();
+                let line = remove_after_hash_or_semicolon(line.unwrap())
+                    .trim()
+                    .to_string();
+                if line.len() == 0 {
+                    continue;
+                }
                 if !in_text_section {
                     if line == ".text" {
                         in_text_section = true;
@@ -1047,57 +1068,53 @@ pub fn assemble(path: &str, style: &str) {
                     }
                     if line.ends_with(":") {
                         continue;
-                    } else {
-                        let inst = parse_instruction(&line);
-                        match inst {
-                            None => {
-                                println!("paser error: {}", line);
-                                panic!();
-                            }
-                            Some(inst) => {
-                                let binary_lines = instruction_to_binary(
-                                    inst,
-                                    line_count * 4,
-                                    &text_label_address_map,
-                                    &data_label_address_value_map,
-                                );
-                                let binary_lines: Vec<&str> = binary_lines.split('\n').collect();
-                                for binary in binary_lines {
-                                    if binary == "???" {
-                                        print!("\0\0\0\0");
-                                        eprintln!("unexpected instruction: {}", line);
-                                        line_count += 1;
-                                    } else {
-                                        let num: u32 = u32::from_str_radix(binary, 2).unwrap();
-                                        if style == "2" {
-                                            out_file
-                                                .write_fmt(format_args!("{:>032b}\n", num))
-                                                .unwrap();
-                                        } else if style == "16" {
-                                            out_file
-                                                .write_fmt(format_args!("{:>08x}\n", num))
-                                                .unwrap();
-                                        } else if style == "ram" {
-                                            out_file
-                                                .write_fmt(format_args!(
-                                                    "RAM[{}] <= 32'b{:>032b};\n",
-                                                    line_count, num
-                                                ))
-                                                .unwrap();
-                                        } else {
-                                            let bytes_to_write: [u8; 4] = [
-                                                (num & 0xff) as u8,
-                                                ((num >> 8) & 0xff) as u8,
-                                                ((num >> 16) & 0xff) as u8,
-                                                ((num >> 24) & 0xff) as u8,
-                                            ];
-                                            out_file.write_all(&bytes_to_write).unwrap();
-                                        }
-                                        line_count += 1;
+                    }
+                    let inst = parse_instruction(&line);
+                    if let Some(inst) = inst {
+                        let binary_lines = instruction_to_binary(
+                            inst,
+                            line_count * 4,
+                            &text_label_address_map,
+                            &data_label_address_value_map,
+                        );
+                        let binary_lines: Vec<&str> = binary_lines.split('\n').collect();
+                        for binary in binary_lines {
+                            if binary == "???" {
+                                panic!("unexpected instruction: {}", line);
+                            } else {
+                                let num: u32 = u32::from_str_radix(binary, 2).unwrap();
+                                match style {
+                                    "2" => {
+                                        out_file
+                                            .write_fmt(format_args!("{:>032b}\n", num))
+                                            .unwrap();
+                                    }
+                                    "16" => {
+                                        out_file.write_fmt(format_args!("{:>08x}\n", num)).unwrap();
+                                    }
+                                    "ram" => {
+                                        out_file
+                                            .write_fmt(format_args!(
+                                                "RAM[{}] <= 32'b{:>032b};\n",
+                                                line_count, num
+                                            ))
+                                            .unwrap();
+                                    }
+                                    _ => {
+                                        let bytes_to_write: [u8; 4] = [
+                                            (num & 0xff) as u8,
+                                            ((num >> 8) & 0xff) as u8,
+                                            ((num >> 16) & 0xff) as u8,
+                                            ((num >> 24) & 0xff) as u8,
+                                        ];
+                                        out_file.write_all(&bytes_to_write).unwrap();
                                     }
                                 }
+                                line_count += 1;
                             }
                         }
+                    } else {
+                        panic!("paser error: {}", line);
                     }
                 }
             }
