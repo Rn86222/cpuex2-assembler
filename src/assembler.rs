@@ -9,12 +9,27 @@ struct Instruction {
     operands: Vec<String>,
 }
 
-fn parse_instruction(line: &str) -> Option<Instruction> {
+fn parse_instruction(line: &str) -> Instruction {
     let name;
     let operands_line;
-    if let Some(index) = line.find(' ') {
-        name = line[0..index].to_string();
-        operands_line = &line[index..];
+    let space_index = line.find(' ');
+    let tab_index = line.find('\t');
+    if let Some(space_index) = space_index {
+        if let Some(tab_index) = tab_index {
+            if space_index < tab_index {
+                name = line[0..space_index].to_string();
+                operands_line = &line[space_index..];
+            } else {
+                name = line[0..tab_index].to_string();
+                operands_line = &line[tab_index..];
+            }
+        } else {
+            name = line[0..space_index].to_string();
+            operands_line = &line[space_index..];
+        }
+    } else if let Some(tab_index) = tab_index {
+        name = line[0..tab_index].to_string();
+        operands_line = &line[tab_index..];
     } else {
         name = line.to_string();
         operands_line = "";
@@ -27,7 +42,7 @@ fn parse_instruction(line: &str) -> Option<Instruction> {
         operand = operand.trim().to_string();
         operands.push(operand);
     }
-    Some(Instruction { name, operands })
+    Instruction { name, operands }
 }
 
 fn format_int_register(reg: &String) -> String {
@@ -65,11 +80,12 @@ fn format_int_register(reg: &String) -> String {
                     assert!(2 <= index && index <= 11);
                     format!("{:>05b}", index + 16)
                 }
-                _ => {
+                "x" => {
                     let index = u8::from_str_radix(&reg, 10).unwrap();
                     assert!(index <= 31);
                     format!("{:>05b}", index)
                 }
+                _ => unreachable!("int register format error"),
             }
         }
     }
@@ -82,8 +98,7 @@ fn format_float_register(reg: &String) -> String {
     let second: &str = &reg[1..2].to_string();
     match second {
         "t" => {
-            reg.remove(0);
-            reg.remove(1);
+            reg = reg.replace("ft", "");
             let index = u8::from_str_radix(&reg, 10).unwrap();
             if index <= 7 {
                 format!("{:>05b}", index)
@@ -93,8 +108,7 @@ fn format_float_register(reg: &String) -> String {
             }
         }
         "s" => {
-            reg.remove(0);
-            reg.remove(1);
+            reg = reg.replace("fs", "");
             let index = u8::from_str_radix(&reg, 10).unwrap();
             if index <= 1 {
                 format!("{:>05b}", index + 8)
@@ -104,18 +118,18 @@ fn format_float_register(reg: &String) -> String {
             }
         }
         "a" => {
-            reg.remove(0);
-            reg.remove(1);
+            reg = reg.replace("fa", "");
             let index = u8::from_str_radix(&reg, 10).unwrap();
             assert!(index <= 7);
             format!("{:>05b}", index + 10)
         }
-        _ => {
-            reg.remove(0);
+        "f" => {
+            reg = reg.replace("f", "");
             let index = u8::from_str_radix(&reg, 10).unwrap();
             assert!(index <= 31);
             format!("{:>05b}", index)
         }
+        _ => unreachable!("float register format error"),
     }
 }
 
@@ -354,6 +368,20 @@ fn format_fd_fs1_fs2(operands: &Vec<String>, funct3: u8, funct7: u8, op: u8) -> 
     format!("{}{:>07b}", fd_fs1_fs2(operands, funct3, funct7), op)
 }
 
+fn rd_fs1_fs2(operands: &Vec<String>, funct3: u8, funct7: u8) -> String {
+    assert_eq!(operands.len(), 3);
+    let rd = format_int_register(&operands[0]);
+    let fs1 = format_float_register(&operands[1]);
+    let fs2 = format_float_register(&operands[2]);
+    let funct3 = format!("{:>03b}", funct3);
+    let funct7 = format!("{:>07b}", funct7);
+    format!("{}{}{}{}{}", funct7, fs2, fs1, funct3, rd)
+}
+
+fn format_rd_fs1_fs2(operands: &Vec<String>, funct3: u8, funct7: u8, op: u8) -> String {
+    format!("{}{:>07b}", rd_fs1_fs2(operands, funct3, funct7), op)
+}
+
 fn fd_fs1_with_rs2(operands: &Vec<String>, funct3: u8, funct7: u8, rs2: u8) -> String {
     assert_eq!(operands.len(), 2);
     let fd = format_float_register(&operands[0]);
@@ -398,6 +426,30 @@ fn format_rd_fs1_with_rs2(
     format!(
         "{}{:>07b}",
         rd_fs1_with_rs2(operands, funct3, funct7, rs2),
+        op
+    )
+}
+
+fn fd_rs1_with_rs2(operands: &Vec<String>, funct3: u8, funct7: u8, rs2: u8) -> String {
+    assert_eq!(operands.len(), 2);
+    let fd = format_float_register(&operands[0]);
+    let rs1 = format_int_register(&operands[1]);
+    let funct3 = format!("{:>03b}", funct3);
+    let funct7 = format!("{:>07b}", funct7);
+    let rs2 = format!("{:>05b}", rs2);
+    format!("{}{}{}{}{}", funct7, rs2, rs1, funct3, fd)
+}
+
+fn format_fd_rs1_with_rs2(
+    operands: &Vec<String>,
+    funct3: u8,
+    funct7: u8,
+    rs2: u8,
+    op: u8,
+) -> String {
+    format!(
+        "{}{:>07b}",
+        fd_rs1_with_rs2(operands, funct3, funct7, rs2),
         op
     )
 }
@@ -504,6 +556,7 @@ fn instruction_to_binary(
 ) -> String {
     let name: &str = &inst.name;
     let operands = &inst.operands;
+    // println!("{} {:?}", name, operands);
     match name {
         "lb" => {
             assert_eq!(operands.len(), 2);
@@ -591,28 +644,28 @@ fn instruction_to_binary(
         "fmsub" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 71),
         "fnmsub" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 75),
         "fnmadd" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 79),
-        "fadd" => format_fd_fs1_fs2(operands, 0b000, 0b0000000, 83),
-        "fsub" => format_fd_fs1_fs2(operands, 0b000, 0b0000100, 83),
-        "fmul" => format_fd_fs1_fs2(operands, 0b000, 0b0001000, 83),
-        "fdiv" => format_fd_fs1_fs2(operands, 0b000, 0b0001100, 83),
-        "fsqrt" => format_fd_fs1_with_rs2(operands, 0b000, 0b0101100, 0b00000, 83),
-        "fsgnj" => format_fd_fs1_fs2(operands, 0b000, 0b0010000, 83),
-        "fsgnjn" => format_fd_fs1_fs2(operands, 0b001, 0b0010000, 83),
-        "fsgnjx" => format_fd_fs1_fs2(operands, 0b010, 0b0010000, 83),
-        "fmin" => format_fd_fs1_fs2(operands, 0b000, 0b0010100, 83),
-        "fmax" => format_fd_fs1_fs2(operands, 0b001, 0b0010100, 83),
-        "feq" => format_fd_fs1_fs2(operands, 0b010, 0b1010000, 83),
-        "flt" => format_fd_fs1_fs2(operands, 0b001, 0b1010000, 83),
-        "fle" => format_fd_fs1_fs2(operands, 0b000, 0b1010000, 83),
+        "fadd" | "fadd.s" => format_fd_fs1_fs2(operands, 0b000, 0b0000000, 83),
+        "fsub" | "fsub.s" => format_fd_fs1_fs2(operands, 0b000, 0b0000100, 83),
+        "fmul" | "fmul.s" => format_fd_fs1_fs2(operands, 0b000, 0b0001000, 83),
+        "fdiv" | "fdiv.s" => format_fd_fs1_fs2(operands, 0b000, 0b0001100, 83),
+        "fsqrt" | "fsqrt.s" => format_fd_fs1_with_rs2(operands, 0b000, 0b0101100, 0b00000, 83),
+        "fsgnj" | "fsgnj.s" => format_fd_fs1_fs2(operands, 0b000, 0b0010000, 83),
+        "fsgnjn" | "fsgnjn.s" => format_fd_fs1_fs2(operands, 0b001, 0b0010000, 83),
+        "fsgnjx" | "fsgnjx.s" => format_fd_fs1_fs2(operands, 0b010, 0b0010000, 83),
+        "fmin" | "fmin.s" => format_fd_fs1_fs2(operands, 0b000, 0b0010100, 83),
+        "fmax" | "fmax.s" => format_fd_fs1_fs2(operands, 0b001, 0b0010100, 83),
+        "feq" | "feq.s" => format_rd_fs1_fs2(operands, 0b010, 0b1010000, 83),
+        "flt" | "flt.s" => format_rd_fs1_fs2(operands, 0b001, 0b1010000, 83),
+        "fle" | "fle.s" => format_rd_fs1_fs2(operands, 0b000, 0b1010000, 83),
         "fclass" => format_rd_fs1_with_rs2(operands, 0b001, 0b1110000, 0b00000, 83),
         "flw" => format_fd_imm12rs1(operands, 0b010, 7),
         "fsw" => format_fs2_imm12rs1(operands, 0b010, 39),
         "fcvt.w.s" => format_rd_fs1_with_rs2(operands, 0b000, 0b1100000, 0b00000, 83),
         "fcvt.wu.s" => format_rd_fs1_with_rs2(operands, 0b000, 0b1100001, 0b00000, 83),
-        "fcvt.s.w" => format_fd_fs1_with_rs2(operands, 0b000, 0b1101000, 0b00000, 83),
-        "fcvt.s.wu" => format_fd_fs1_with_rs2(operands, 0b000, 0b1101001, 0b00000, 83),
+        "fcvt.s.w" => format_fd_rs1_with_rs2(operands, 0b000, 0b1101000, 0b00000, 83),
+        "fcvt.s.wu" => format_fd_rs1_with_rs2(operands, 0b000, 0b1101001, 0b00000, 83),
         "fmv.x.w" => format_rd_fs1_with_rs2(operands, 0b000, 0b1110000, 0b00000, 83),
-        "fmv.w.x" => format_fd_fs1_with_rs2(operands, 0b000, 0b1111000, 0b00000, 83),
+        "fmv.w.x" => format_fd_rs1_with_rs2(operands, 0b000, 0b1111000, 0b00000, 83),
         "mul" => format_rd_rs1_rs2(operands, 0b000, 0b0000001, 51),
         "mulh" => format_rd_rs1_rs2(operands, 0b001, 0b0000001, 51),
         "mulhsu" => format_rd_rs1_rs2(operands, 0b010, 0b0000001, 51),
@@ -632,12 +685,23 @@ fn instruction_to_binary(
             if operands[1].len() >= 2 && &operands[1][0..2] == "0x" {
                 imm = i32::from_str_radix(&operands[1][2..], 16).unwrap();
             } else {
-                imm = i32::from_str_radix(&operands[1], 10).unwrap();
+                let parsed_result = i32::from_str_radix(&operands[1], 10);
+                if parsed_result.is_err() {
+                    if let Some((address, _)) = data_label_address_map.get(&operands[1]) {
+                        imm = *address as i32;
+                    } else if let Some(address) = text_label_address_map.get(&operands[1]) {
+                        imm = *address as i32;
+                    } else {
+                        panic!("label not found: {}", operands[1]);
+                    }
+                } else {
+                    imm = parsed_result.unwrap();
+                }
             }
             if -2_i32.pow(12 - 1) <= imm && imm <= 2_i32.pow(12 - 1) {
                 let mut new_operands = vec![operands[0].clone()];
                 new_operands.push(String::from("x0"));
-                new_operands.push(operands[1].clone());
+                new_operands.push(imm.to_string());
                 format_rd_rs1_imm12(&new_operands, 0b000, 19)
             } else {
                 let mut first_new_operands = vec![operands[0].clone()];
@@ -817,7 +881,12 @@ fn instruction_to_binary(
             format_rd_label(&new_operands, 111, current_address, text_label_address_map)
         }
         "la" => {
-            let (imm, _) = *data_label_address_map.get(&operands[1]).unwrap();
+            let data_address = data_label_address_map.get(&operands[1]);
+            let imm = if data_address.is_some() {
+                data_address.unwrap().0
+            } else {
+                *text_label_address_map.get(&operands[1]).unwrap()
+            };
             let mut first_new_operands = vec![String::from("ra")];
             let mut second_new_operands = vec![operands[0].clone(), operands[0].clone()];
             second_new_operands.push((imm & 4095).to_string());
@@ -861,7 +930,12 @@ fn line_count_of(inst: Instruction) -> usize {
             if operands[1].len() >= 2 && &operands[1][0..2] == "0x" {
                 imm = i32::from_str_radix(&operands[1][2..], 16).unwrap();
             } else {
-                imm = i32::from_str_radix(&operands[1], 10).unwrap();
+                let parsed_result = i32::from_str_radix(&operands[1], 10);
+                if let Err(_) = parsed_result {
+                    return 2;
+                } else {
+                    imm = parsed_result.unwrap();
+                }
             }
             if -2_i32.pow(12 - 1) <= imm && imm <= 2_i32.pow(12 - 1) {
                 1
@@ -926,14 +1000,8 @@ fn create_text_label_address_map(path: &str, section_exists: bool) -> HashMap<St
                         line.pop();
                         label_address_map.insert(line, line_count * 4);
                     } else {
-                        match parse_instruction(&line) {
-                            None => {
-                                line_count += 1;
-                            }
-                            Some(inst) => {
-                                line_count += line_count_of(inst);
-                            }
-                        }
+                        let inst = parse_instruction(&line);
+                        line_count += line_count_of(inst);
                     }
                 } else {
                     if line == ".text" {
@@ -950,7 +1018,7 @@ enum State {
     None,
     InTextSection,
     InDataSection,
-    FindingVariableValue((String, usize)),
+    InVariableData((String, usize)),
 }
 
 fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u32)> {
@@ -962,7 +1030,7 @@ fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u3
         Ok(file) => {
             let mut state = State::None;
             let reader = BufReader::new(file);
-            let mut variable_count = 0;
+            let mut variable_address = 0;
             for line in reader.lines() {
                 let mut line = remove_after_hash_or_semicolon(line.unwrap())
                     .trim()
@@ -986,23 +1054,38 @@ fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u3
                     State::InDataSection => {
                         if line.ends_with(":") {
                             line.pop();
-                            state = State::FindingVariableValue((line, variable_count * 4));
-                            variable_count += 1;
+                            state = State::InVariableData((line, variable_address));
                         } else if line == ".text" {
                             break;
                         }
                     }
-                    State::FindingVariableValue((name, address)) => {
+                    State::InVariableData((name, address)) => {
                         let splited_line = line.split_whitespace().collect::<Vec<&str>>();
                         assert_eq!(splited_line.len(), 2);
-                        assert_eq!(splited_line[0], ".long");
-                        let mut value_str = splited_line[1].to_string();
-                        if value_str.starts_with("0x") {
-                            value_str = value_str[2..].to_string();
+                        match splited_line[0] {
+                            ".long" => {
+                                let mut value_str = splited_line[1].to_string();
+                                if value_str.starts_with("0x") {
+                                    value_str = value_str[2..].to_string();
+                                }
+                                let value = u32::from_str_radix(&value_str, 16).unwrap();
+                                label_address_map.insert(name.clone(), (address, value));
+                                variable_address += 4;
+                                state = State::InDataSection;
+                            }
+                            ".space" => {
+                                let space_size = splited_line[1].parse::<usize>().unwrap();
+                                label_address_map.insert(name.clone(), (address, 0));
+                                variable_address += space_size;
+                                state = State::InDataSection;
+                            }
+                            ".globl" => {
+                                state = State::InVariableData((name, address));
+                            }
+                            _ => {
+                                panic!("unexpected data: {}", line);
+                            }
                         }
-                        let value = u32::from_str_radix(&value_str, 16).unwrap();
-                        label_address_map.insert(name.clone(), (address, value));
-                        state = State::InDataSection;
                     }
                 }
             }
@@ -1011,7 +1094,7 @@ fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u3
     label_address_map
 }
 
-fn section_exists(path: &str) -> bool {
+fn has_sections(path: &str) -> bool {
     match File::open(path) {
         Err(e) => {
             panic!("Failed in opening file ({}).", e);
@@ -1025,7 +1108,7 @@ fn section_exists(path: &str) -> bool {
                 if line.len() == 0 {
                     continue;
                 }
-                if line == ".text" {
+                if line == ".text" || line == ".data" {
                     return true;
                 }
             }
@@ -1035,8 +1118,8 @@ fn section_exists(path: &str) -> bool {
 }
 
 pub fn assemble(path: &str, style: &str) {
-    let section_exists = section_exists(path);
-    let text_label_address_map = create_text_label_address_map(path, section_exists);
+    let has_sections = has_sections(path);
+    let text_label_address_map = create_text_label_address_map(path, has_sections);
     let data_label_address_value_map = create_data_label_address_value_map(path);
     match File::open(path) {
         Err(e) => {
@@ -1050,7 +1133,7 @@ pub fn assemble(path: &str, style: &str) {
             let mut out_file = File::create(out_file_name).unwrap();
             let reader = BufReader::new(file);
             let mut line_count = 0;
-            let mut in_text_section = !section_exists;
+            let mut in_text_section = !has_sections;
             for line in reader.lines() {
                 let line = remove_after_hash_or_semicolon(line.unwrap())
                     .trim()
@@ -1069,52 +1152,49 @@ pub fn assemble(path: &str, style: &str) {
                     if line.ends_with(":") {
                         continue;
                     }
+                    if line.contains(".globl") {
+                        continue;
+                    }
                     let inst = parse_instruction(&line);
-                    if let Some(inst) = inst {
-                        let binary_lines = instruction_to_binary(
-                            inst,
-                            line_count * 4,
-                            &text_label_address_map,
-                            &data_label_address_value_map,
-                        );
-                        let binary_lines: Vec<&str> = binary_lines.split('\n').collect();
-                        for binary in binary_lines {
-                            if binary == "???" {
-                                panic!("unexpected instruction: {}", line);
-                            } else {
-                                let num: u32 = u32::from_str_radix(binary, 2).unwrap();
-                                match style {
-                                    "2" => {
-                                        out_file
-                                            .write_fmt(format_args!("{:>032b}\n", num))
-                                            .unwrap();
-                                    }
-                                    "16" => {
-                                        out_file.write_fmt(format_args!("{:>08x}\n", num)).unwrap();
-                                    }
-                                    "ram" => {
-                                        out_file
-                                            .write_fmt(format_args!(
-                                                "RAM[{}] <= 32'b{:>032b};\n",
-                                                line_count, num
-                                            ))
-                                            .unwrap();
-                                    }
-                                    _ => {
-                                        let bytes_to_write: [u8; 4] = [
-                                            (num & 0xff) as u8,
-                                            ((num >> 8) & 0xff) as u8,
-                                            ((num >> 16) & 0xff) as u8,
-                                            ((num >> 24) & 0xff) as u8,
-                                        ];
-                                        out_file.write_all(&bytes_to_write).unwrap();
-                                    }
+                    let binary_lines = instruction_to_binary(
+                        inst,
+                        line_count * 4,
+                        &text_label_address_map,
+                        &data_label_address_value_map,
+                    );
+                    let binary_lines: Vec<&str> = binary_lines.split('\n').collect();
+                    for binary in binary_lines {
+                        if binary == "???" {
+                            panic!("unexpected instruction: {}", line);
+                        } else {
+                            let num: u32 = u32::from_str_radix(binary, 2).unwrap();
+                            match style {
+                                "2" => {
+                                    out_file.write_fmt(format_args!("{:>032b}\n", num)).unwrap();
                                 }
-                                line_count += 1;
+                                "16" => {
+                                    out_file.write_fmt(format_args!("{:>08x}\n", num)).unwrap();
+                                }
+                                "ram" => {
+                                    out_file
+                                        .write_fmt(format_args!(
+                                            "RAM[{}] <= 32'b{:>032b};\n",
+                                            line_count, num
+                                        ))
+                                        .unwrap();
+                                }
+                                _ => {
+                                    let bytes_to_write: [u8; 4] = [
+                                        (num & 0xff) as u8,
+                                        ((num >> 8) & 0xff) as u8,
+                                        ((num >> 16) & 0xff) as u8,
+                                        ((num >> 24) & 0xff) as u8,
+                                    ];
+                                    out_file.write_all(&bytes_to_write).unwrap();
+                                }
                             }
+                            line_count += 1;
                         }
-                    } else {
-                        panic!("paser error: {}", line);
                     }
                 }
             }
