@@ -682,14 +682,17 @@ fn instruction_to_binary(
         "li" => {
             assert_eq!(operands.len(), 2);
             let imm;
+            let mut two_lines_flag = false;
             if operands[1].len() >= 2 && &operands[1][0..2] == "0x" {
                 imm = i32::from_str_radix(&operands[1][2..], 16).unwrap();
             } else {
                 let parsed_result = i32::from_str_radix(&operands[1], 10);
                 if parsed_result.is_err() {
                     if let Some((address, _)) = data_label_address_map.get(&operands[1]) {
+                        two_lines_flag = true;
                         imm = *address as i32;
                     } else if let Some(address) = text_label_address_map.get(&operands[1]) {
+                        two_lines_flag = true;
                         imm = *address as i32;
                     } else {
                         panic!("label not found: {}", operands[1]);
@@ -698,7 +701,7 @@ fn instruction_to_binary(
                     imm = parsed_result.unwrap();
                 }
             }
-            if -2_i32.pow(12 - 1) <= imm && imm <= 2_i32.pow(12 - 1) {
+            if -2_i32.pow(12 - 1) <= imm && imm <= 2_i32.pow(12 - 1) && !two_lines_flag {
                 let mut new_operands = vec![operands[0].clone()];
                 new_operands.push(String::from("x0"));
                 new_operands.push(imm.to_string());
@@ -996,6 +999,9 @@ fn create_text_label_address_map(path: &str, section_exists: bool) -> HashMap<St
                     if line == ".data" {
                         break;
                     }
+                    if line.contains(".globl") {
+                        continue;
+                    }
                     if line.ends_with(":") {
                         line.pop();
                         label_address_map.insert(line, line_count * 4);
@@ -1030,7 +1036,7 @@ fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u3
         Ok(file) => {
             let mut state = State::None;
             let reader = BufReader::new(file);
-            let mut variable_address = 0;
+            let mut variable_address = 64 * 1024 * 1024;
             for line in reader.lines() {
                 let mut line = remove_after_hash_or_semicolon(line.unwrap())
                     .trim()
@@ -1117,10 +1123,35 @@ fn has_sections(path: &str) -> bool {
     }
 }
 
+fn output_data_section(
+    path: &str,
+    data_label_address_value_map: &HashMap<String, (usize, u32)>,
+    show_label: bool,
+) {
+    let mut output_path = path.to_string();
+    output_path.truncate(output_path.rfind('.').unwrap_or(output_path.len()));
+    output_path.push_str(".data");
+    let mut output_file = File::create(output_path).unwrap();
+    if show_label {
+        for (label, (address, value)) in data_label_address_value_map.iter() {
+            output_file
+                .write_fmt(format_args!("{} {} {}\n", label, address, value))
+                .unwrap();
+        }
+    } else {
+        for (_, (address, value)) in data_label_address_value_map.iter() {
+            output_file
+                .write_fmt(format_args!("{} {}\n", address, value))
+                .unwrap();
+        }
+    }
+}
+
 pub fn assemble(path: &str, style: &str) {
     let has_sections = has_sections(path);
     let text_label_address_map = create_text_label_address_map(path, has_sections);
     let data_label_address_value_map = create_data_label_address_value_map(path);
+    output_data_section(path, &data_label_address_value_map, false);
     match File::open(path) {
         Err(e) => {
             panic!("Failed in opening file ({}).", e);
