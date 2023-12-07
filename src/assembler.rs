@@ -679,7 +679,7 @@ fn instruction_to_binary(
             let new_operands = vec![String::from("x0"), String::from("x0"), String::from("0")];
             format_rd_rs1_imm12(&new_operands, 0b000, 19)
         }
-        "li" => {
+        "li" | "la" => {
             assert_eq!(operands.len(), 2);
             let imm;
             let mut two_lines_flag = false;
@@ -883,25 +883,25 @@ fn instruction_to_binary(
             let new_operands = vec![String::from("ra"), operands[0].clone()];
             format_rd_label(&new_operands, 111, current_address, text_label_address_map)
         }
-        "la" => {
-            let data_address = data_label_address_map.get(&operands[1]);
-            let imm = if data_address.is_some() {
-                data_address.unwrap().0
-            } else {
-                *text_label_address_map.get(&operands[1]).unwrap()
-            };
-            let mut first_new_operands = vec![String::from("ra")];
-            let mut second_new_operands = vec![operands[0].clone(), operands[0].clone()];
-            second_new_operands.push((imm & 4095).to_string());
-            if (imm & 4095) & (1 << 11) != 0 {
-                first_new_operands.push(((imm >> 12) + 1).to_string());
-            } else {
-                first_new_operands.push((imm >> 12).to_string());
-            }
-            let first = format_rd_upimm20(&first_new_operands, 23);
-            let second = format_rd_rs1_imm12(&second_new_operands, 0b000, 19);
-            format!("{}\n{}", first, second)
-        }
+        // "la" => {
+        //     let data_address = data_label_address_map.get(&operands[1]);
+        //     let imm = if data_address.is_some() {
+        //         data_address.unwrap().0
+        //     } else {
+        //         *text_label_address_map.get(&operands[1]).unwrap()
+        //     };
+        //     let mut first_new_operands = vec![String::from("ra")];
+        //     let mut second_new_operands = vec![operands[0].clone(), operands[0].clone()];
+        //     second_new_operands.push((imm & 4095).to_string());
+        //     if (imm & 4095) & (1 << 11) != 0 {
+        //         first_new_operands.push(((imm >> 12) + 1).to_string());
+        //     } else {
+        //         first_new_operands.push((imm >> 12).to_string());
+        //     }
+        //     let first = format_rd_upimm20(&first_new_operands, 23);
+        //     let second = format_rd_rs1_imm12(&second_new_operands, 0b000, 19);
+        //     format!("{}\n{}", first, second)
+        // }
         // additional instructions
         "absdiff" => format_rd_rs1_rs2(operands, 0b000, 0b0110000, 51),
         "abs" => {
@@ -1132,6 +1132,9 @@ fn output_data_section(
     output_path.truncate(output_path.rfind('.').unwrap_or(output_path.len()));
     output_path.push_str(".data");
     let mut output_file = File::create(output_path).unwrap();
+    let mut data_label_address_value_map: Vec<(&String, &(usize, u32))> =
+        data_label_address_value_map.iter().collect();
+    data_label_address_value_map.sort_by(|a, b| a.1 .0.cmp(&b.1 .0));
     if show_label {
         for (label, (address, value)) in data_label_address_value_map.iter() {
             output_file
