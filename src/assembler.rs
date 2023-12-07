@@ -37,16 +37,14 @@ fn parse_instruction(line: &str) -> Instruction {
     let splited: Vec<&str> = operands_line.split(',').collect();
 
     let mut operands = vec![];
-    for i in 0..splited.len() {
-        let mut operand = String::from(splited[i]);
-        operand = operand.trim().to_string();
+    for operand in &splited {
+        let operand = operand.to_string().trim().to_string();
         operands.push(operand);
     }
     Instruction { name, operands }
 }
 
-fn format_int_register(reg: &String) -> String {
-    let reg: &str = &reg.clone();
+fn format_int_register(reg: &str) -> String {
     match reg {
         "zero" => format!("{:>05b}", 0),
         "ra" => format!("{:>05b}", 1),
@@ -57,31 +55,31 @@ fn format_int_register(reg: &String) -> String {
         "s1" => format!("{:>05b}", 9),
         _ => {
             assert_ne!(reg.len(), 0);
+            let first: &str = &reg[0..1];
             let mut reg = String::from(reg);
-            let first: &str = &reg[0..1].to_string();
             reg.remove(0);
             match first {
                 "t" => {
-                    let index = u8::from_str_radix(&reg, 10).unwrap();
+                    let index = reg.parse::<u8>().unwrap();
                     if index <= 2 {
                         format!("{:>05b}", index + 5)
                     } else {
-                        assert!(3 <= index && index <= 6);
+                        assert!((3..=6).contains(&index));
                         format!("{:>05b}", index + 25)
                     }
                 }
                 "a" => {
-                    let index = u8::from_str_radix(&reg, 10).unwrap();
+                    let index = reg.parse::<u8>().unwrap();
                     assert!(index <= 7);
                     format!("{:>05b}", index + 10)
                 }
                 "s" => {
-                    let index = u8::from_str_radix(&reg, 10).unwrap();
-                    assert!(2 <= index && index <= 11);
+                    let index = reg.parse::<u8>().unwrap();
+                    assert!((2..=11).contains(&index));
                     format!("{:>05b}", index + 16)
                 }
                 "x" => {
-                    let index = u8::from_str_radix(&reg, 10).unwrap();
+                    let index = reg.parse::<u8>().unwrap();
                     assert!(index <= 31);
                     format!("{:>05b}", index)
                 }
@@ -91,41 +89,40 @@ fn format_int_register(reg: &String) -> String {
     }
 }
 
-fn format_float_register(reg: &String) -> String {
-    let reg: &str = &reg.clone();
+fn format_float_register(reg: &str) -> String {
     assert!(reg.len() >= 2);
     let mut reg = String::from(reg);
-    let second: &str = &reg[1..2].to_string();
+    let second: &str = &reg[1..2];
     match second {
         "t" => {
             reg = reg.replace("ft", "");
-            let index = u8::from_str_radix(&reg, 10).unwrap();
+            let index = reg.parse::<u8>().unwrap();
             if index <= 7 {
                 format!("{:>05b}", index)
             } else {
-                assert!(8 <= index && index <= 11);
+                assert!((8..=11).contains(&index));
                 format!("{:>05b}", index + 20)
             }
         }
         "s" => {
             reg = reg.replace("fs", "");
-            let index = u8::from_str_radix(&reg, 10).unwrap();
+            let index = reg.parse::<u8>().unwrap();
             if index <= 1 {
                 format!("{:>05b}", index + 8)
             } else {
-                assert!(2 <= index && index <= 11);
+                assert!((2..=11).contains(&index));
                 format!("{:>05b}", index + 16)
             }
         }
         "a" => {
             reg = reg.replace("fa", "");
-            let index = u8::from_str_radix(&reg, 10).unwrap();
+            let index = reg.parse::<u8>().unwrap();
             assert!(index <= 7);
             format!("{:>05b}", index + 10)
         }
         "f" => {
-            reg = reg.replace("f", "");
-            let index = u8::from_str_radix(&reg, 10).unwrap();
+            reg = reg.replace('f', "");
+            let index = reg.parse::<u8>().unwrap();
             assert!(index <= 31);
             format!("{:>05b}", index)
         }
@@ -134,48 +131,44 @@ fn format_float_register(reg: &String) -> String {
 }
 
 fn imm12(value: &String) -> String {
-    let value_i32;
-    if value.len() >= 2 && &value[0..2] == "0x" {
-        value_i32 = i32::from_str_radix(&value[2..], 16).unwrap();
+    let value_i32 = if value.len() >= 2 && &value[0..2] == "0x" {
+        i32::from_str_radix(&value[2..], 16).unwrap()
     } else {
-        value_i32 = i32::from_str_radix(value, 10).unwrap();
-    }
+        value.parse::<i32>().unwrap()
+    };
     let formatted = format!("{:>012b}", value_i32);
     let length = formatted.len();
     formatted[length - 12..length].to_string()
 }
 
 fn imm20(value: &String) -> String {
-    let value_i32;
-    if value.len() >= 2 && &value[0..2] == "0x" {
-        value_i32 = i32::from_str_radix(&value[2..], 16).unwrap();
+    let value_i32 = if value.len() >= 2 && &value[0..2] == "0x" {
+        i32::from_str_radix(&value[2..], 16).unwrap()
     } else {
-        value_i32 = i32::from_str_radix(value, 10).unwrap();
-    }
+        value.parse::<i32>().unwrap()
+    };
     let formatted = format!("{:>020b}", value_i32);
     let length = formatted.len();
     formatted[length - 20..length].to_string()
 }
 
 fn uimm5(value: &String) -> String {
-    let value_u32;
-    if value.len() >= 2 && &value[0..2] == "0x" {
-        value_u32 = u32::from_str_radix(&value[2..], 16).unwrap() & 0b11111;
+    let value_u32 = if value.len() >= 2 && &value[0..2] == "0x" {
+        u32::from_str_radix(&value[2..], 16).unwrap() & 0b11111
     } else {
-        value_u32 = u32::from_str_radix(value, 10).unwrap() & 0b11111;
-    }
+        value.parse::<u32>().unwrap() & 0b11111
+    };
     let formatted = format!("{:>05b}", value_u32);
     let length = formatted.len();
     formatted[length - 5..length].to_string()
 }
 
 fn upimm20(value: &String) -> String {
-    let value_i32;
-    if value.len() >= 2 && &value[0..2] == "0x" {
-        value_i32 = i32::from_str_radix(&value[2..], 16).unwrap();
+    let value_i32 = if value.len() >= 2 && &value[0..2] == "0x" {
+        i32::from_str_radix(&value[2..], 16).unwrap()
     } else {
-        value_i32 = i32::from_str_radix(value, 10).unwrap();
-    }
+        value.parse::<i32>().unwrap()
+    };
     let formatted = format!("{:>020b}", value_i32);
     let length = formatted.len();
     formatted[length - 20..length].to_string()
@@ -506,7 +499,7 @@ fn format_rd(operands: &Vec<String>, funct3: u8, op: u8) -> String {
 
 fn resolve_load_address_symbol(
     data_label_address_map: &HashMap<String, (usize, u32)>,
-    operands: &Vec<String>,
+    operands: &[String],
     funct3: u8,
     op: u8,
 ) -> String {
@@ -528,7 +521,7 @@ fn resolve_load_address_symbol(
 
 fn resolve_store_address_symbol(
     data_label_address_map: &HashMap<String, (usize, u32)>,
-    operands: &Vec<String>,
+    operands: &[String],
     funct3: u8,
     op: u8,
 ) -> String {
@@ -560,7 +553,7 @@ fn instruction_to_binary(
     match name {
         "lb" => {
             assert_eq!(operands.len(), 2);
-            if operands[1].find('(') == None {
+            if operands[1].find('(').is_none() {
                 resolve_load_address_symbol(data_label_address_map, operands, 0b000, 3)
             } else {
                 format_rd_imm12rs1(operands, 0b000, 3)
@@ -568,7 +561,7 @@ fn instruction_to_binary(
         }
         "lh" => {
             assert_eq!(operands.len(), 2);
-            if operands[1].find('(') == None {
+            if operands[1].find('(').is_none() {
                 resolve_load_address_symbol(data_label_address_map, operands, 0b001, 3)
             } else {
                 format_rd_imm12rs1(operands, 0b001, 3)
@@ -576,7 +569,7 @@ fn instruction_to_binary(
         }
         "lw" => {
             assert_eq!(operands.len(), 2);
-            if operands[1].find('(') == None {
+            if operands[1].find('(').is_none() {
                 resolve_load_address_symbol(data_label_address_map, operands, 0b010, 3)
             } else {
                 format_rd_imm12rs1(operands, 0b010, 3)
@@ -595,21 +588,21 @@ fn instruction_to_binary(
         "andi" => format_rd_rs1_imm12(operands, 0b111, 19),
         "auipc" => format_rd_upimm20(operands, 23),
         "sb" => {
-            if operands.len() == 3 && operands[2].find('(') == None {
+            if operands.len() == 3 && operands[2].find('(').is_none() {
                 resolve_store_address_symbol(data_label_address_map, operands, 0b000, 35)
             } else {
                 format_rs2_imm12rs1(operands, 0b000, 35)
             }
         }
         "sh" => {
-            if operands.len() == 3 && operands[2].find('(') == None {
+            if operands.len() == 3 && operands[2].find('(').is_none() {
                 resolve_store_address_symbol(data_label_address_map, operands, 0b001, 35)
             } else {
                 format_rs2_imm12rs1(operands, 0b001, 35)
             }
         }
         "sw" => {
-            if operands.len() == 3 && operands[2].find('(') == None {
+            if operands.len() == 3 && operands[2].find('(').is_none() {
                 resolve_store_address_symbol(data_label_address_map, operands, 0b010, 35)
             } else {
                 format_rs2_imm12rs1(operands, 0b010, 35)
@@ -686,22 +679,20 @@ fn instruction_to_binary(
             if operands[1].len() >= 2 && &operands[1][0..2] == "0x" {
                 imm = i32::from_str_radix(&operands[1][2..], 16).unwrap();
             } else {
-                let parsed_result = i32::from_str_radix(&operands[1], 10);
-                if parsed_result.is_err() {
-                    if let Some((address, _)) = data_label_address_map.get(&operands[1]) {
-                        two_lines_flag = true;
-                        imm = *address as i32;
-                    } else if let Some(address) = text_label_address_map.get(&operands[1]) {
-                        two_lines_flag = true;
-                        imm = *address as i32;
-                    } else {
-                        panic!("label not found: {}", operands[1]);
-                    }
+                let parsed_result = operands[1].parse::<i32>();
+                if let Ok(parsed_result) = parsed_result {
+                    imm = parsed_result;
+                } else if let Some((address, _)) = data_label_address_map.get(&operands[1]) {
+                    two_lines_flag = true;
+                    imm = *address as i32;
+                } else if let Some(address) = text_label_address_map.get(&operands[1]) {
+                    two_lines_flag = true;
+                    imm = *address as i32;
                 } else {
-                    imm = parsed_result.unwrap();
+                    panic!("label not found: {}", operands[1]);
                 }
             }
-            if -2_i32.pow(12 - 1) <= imm && imm <= 2_i32.pow(12 - 1) && !two_lines_flag {
+            if -(2_i32.pow(12 - 1)) <= imm && imm <= 2_i32.pow(12 - 1) && !two_lines_flag {
                 let mut new_operands = vec![operands[0].clone()];
                 new_operands.push(String::from("x0"));
                 new_operands.push(imm.to_string());
@@ -933,14 +924,14 @@ fn line_count_of(inst: Instruction) -> usize {
             if operands[1].len() >= 2 && &operands[1][0..2] == "0x" {
                 imm = i32::from_str_radix(&operands[1][2..], 16).unwrap();
             } else {
-                let parsed_result = i32::from_str_radix(&operands[1], 10);
-                if let Err(_) = parsed_result {
-                    return 2;
+                let parsed_result = operands[1].parse::<i32>();
+                if let Ok(parsed_result) = parsed_result {
+                    imm = parsed_result;
                 } else {
-                    imm = parsed_result.unwrap();
+                    return 2;
                 }
             }
-            if -2_i32.pow(12 - 1) <= imm && imm <= 2_i32.pow(12 - 1) {
+            if -(2_i32.pow(12 - 1)) <= imm && imm <= 2_i32.pow(12 - 1) {
                 1
             } else {
                 2
@@ -949,14 +940,14 @@ fn line_count_of(inst: Instruction) -> usize {
         "la" => 2,
         "lb" | "lh" | "lw" => {
             assert_eq!(operands.len(), 2);
-            if operands[1].find('(') == None {
+            if operands[1].find('(').is_none() {
                 2
             } else {
                 1
             }
         }
         "sb" | "sh" | "sw" => {
-            if operands.len() == 3 && operands[2].find('(') == None {
+            if operands.len() == 3 && operands[2].find('(').is_none() {
                 2
             } else {
                 1
@@ -992,7 +983,7 @@ fn create_text_label_address_map(path: &str, section_exists: bool) -> HashMap<St
                 let mut line = remove_after_hash_or_semicolon(line.unwrap())
                     .trim()
                     .to_string();
-                if line.len() == 0 {
+                if line.is_empty() {
                     continue;
                 }
                 if in_text_section {
@@ -1002,17 +993,15 @@ fn create_text_label_address_map(path: &str, section_exists: bool) -> HashMap<St
                     if line.contains(".globl") {
                         continue;
                     }
-                    if line.ends_with(":") {
+                    if line.ends_with(':') {
                         line.pop();
                         label_address_map.insert(line, line_count * 4);
                     } else {
                         let inst = parse_instruction(&line);
                         line_count += line_count_of(inst);
                     }
-                } else {
-                    if line == ".text" {
-                        in_text_section = true;
-                    }
+                } else if line == ".text" {
+                    in_text_section = true;
                 }
             }
         }
@@ -1041,7 +1030,7 @@ fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u3
                 let mut line = remove_after_hash_or_semicolon(line.unwrap())
                     .trim()
                     .to_string();
-                if line.len() == 0 {
+                if line.is_empty() {
                     continue;
                 }
                 match state {
@@ -1058,7 +1047,7 @@ fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u3
                         }
                     }
                     State::InDataSection => {
-                        if line.ends_with(":") {
+                        if line.ends_with(':') {
                             line.pop();
                             state = State::InVariableData((line, variable_address));
                         } else if line == ".text" {
@@ -1111,14 +1100,14 @@ fn has_sections(path: &str) -> bool {
                 let line = remove_after_hash_or_semicolon(line.unwrap())
                     .trim()
                     .to_string();
-                if line.len() == 0 {
+                if line.is_empty() {
                     continue;
                 }
                 if line == ".text" || line == ".data" {
                     return true;
                 }
             }
-            return false;
+            false
         }
     }
 }
@@ -1172,7 +1161,7 @@ pub fn assemble(path: &str, style: &str) {
                 let line = remove_after_hash_or_semicolon(line.unwrap())
                     .trim()
                     .to_string();
-                if line.len() == 0 {
+                if line.is_empty() {
                     continue;
                 }
                 if !in_text_section {
@@ -1183,7 +1172,7 @@ pub fn assemble(path: &str, style: &str) {
                     if line == ".data" {
                         break;
                     }
-                    if line.ends_with(":") {
+                    if line.ends_with(':') {
                         continue;
                     }
                     if line.contains(".globl") {
