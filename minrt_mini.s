@@ -240,17 +240,17 @@ min_caml_float_of_int:
 	ret
 .globl  min_caml_print_char
 min_caml_print_char:
-  li  t0,2147483647
+  li  t0,-2147483648
   sw  a0,0(t0)
   ret
 .globl	min_caml_read_float
 min_caml_read_float:
-  li  t0,2147483647
+  li  t0,-2147483648
   flw fa0,0(t0)
   ret
 .globl	min_caml_read_int
 min_caml_read_int:
-  li  t0,2147483647
+  li  t0,-2147483648
   lw  a0,0(t0)
   ret
 mul.2665:
