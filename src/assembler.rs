@@ -9,6 +9,8 @@ struct Instruction {
     operands: Vec<String>,
 }
 
+const DATA_SECTION_ORIGIN: usize = 64 * 1024 * 1024;
+
 fn parse_instruction(line: &str) -> Instruction {
     let name;
     let operands_line;
@@ -1025,7 +1027,7 @@ fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u3
         Ok(file) => {
             let mut state = State::None;
             let reader = BufReader::new(file);
-            let mut variable_address = 64 * 1024 * 1024;
+            let mut variable_address = DATA_SECTION_ORIGIN;
             for line in reader.lines() {
                 let mut line = remove_after_hash_or_semicolon(line.unwrap())
                     .trim()
@@ -1201,7 +1203,7 @@ pub fn assemble(path: &str, style: &str) {
                                 "ram" => {
                                     out_file
                                         .write_fmt(format_args!(
-                                            "RAM[{}] <= 32'b{:>032b};\n",
+                                            "RAM[{}] = 32'b{:>032b};\n",
                                             line_count, num
                                         ))
                                         .unwrap();
