@@ -9,7 +9,15 @@ struct Instruction {
     operands: Vec<String>,
 }
 
-const DATA_SECTION_ORIGIN: usize = 64 * 1024 * 1024;
+const DATA_SECTION_ORIGIN: usize = 0;
+
+fn u32_to_i32(value: u32) -> i32 {
+    if value <= i32::MAX as u32 {
+        value as i32
+    } else {
+        (value as i64 - (u32::MAX as i64 + 1)) as i32
+    }
+}
 
 fn parse_instruction(line: &str) -> Instruction {
     let name;
@@ -551,7 +559,6 @@ fn instruction_to_binary(
 ) -> String {
     let name: &str = &inst.name;
     let operands = &inst.operands;
-    // println!("{} {:?}", name, operands);
     match name {
         "lb" => {
             assert_eq!(operands.len(), 2);
@@ -679,7 +686,7 @@ fn instruction_to_binary(
             let imm;
             let mut two_lines_flag = false;
             if operands[1].len() >= 2 && &operands[1][0..2] == "0x" {
-                imm = i32::from_str_radix(&operands[1][2..], 16).unwrap();
+                imm = u32_to_i32(u32::from_str_radix(&operands[1][2..], 16).unwrap());
             } else {
                 let parsed_result = operands[1].parse::<i32>();
                 if let Ok(parsed_result) = parsed_result {
@@ -924,7 +931,7 @@ fn line_count_of(inst: Instruction) -> usize {
             assert_eq!(operands.len(), 2);
             let imm;
             if operands[1].len() >= 2 && &operands[1][0..2] == "0x" {
-                imm = i32::from_str_radix(&operands[1][2..], 16).unwrap();
+                imm = u32_to_i32(u32::from_str_radix(&operands[1][2..], 16).unwrap());
             } else {
                 let parsed_result = operands[1].parse::<i32>();
                 if let Ok(parsed_result) = parsed_result {
@@ -971,41 +978,31 @@ fn remove_after_hash_or_semicolon(input: String) -> String {
     input
 }
 
-fn create_text_label_address_map(path: &str, section_exists: bool) -> HashMap<String, usize> {
+fn create_text_label_address_map(
+    lines: &Vec<String>,
+    section_exists: bool,
+) -> HashMap<String, usize> {
     let mut label_address_map: HashMap<String, usize> = HashMap::new();
-    match File::open(path) {
-        Err(e) => {
-            panic!("Failed in opening file ({}).", e);
-        }
-        Ok(file) => {
-            let reader = BufReader::new(file);
-            let mut line_count = 0;
-            let mut in_text_section = !section_exists;
-            for line in reader.lines() {
-                let mut line = remove_after_hash_or_semicolon(line.unwrap())
-                    .trim()
-                    .to_string();
-                if line.is_empty() {
-                    continue;
-                }
-                if in_text_section {
-                    if line == ".data" {
-                        break;
-                    }
-                    if line.contains(".globl") {
-                        continue;
-                    }
-                    if line.ends_with(':') {
-                        line.pop();
-                        label_address_map.insert(line, line_count * 4);
-                    } else {
-                        let inst = parse_instruction(&line);
-                        line_count += line_count_of(inst);
-                    }
-                } else if line == ".text" {
-                    in_text_section = true;
-                }
+    let mut line_count = 0;
+    let mut in_text_section = !section_exists;
+    for line in lines {
+        let mut line = line.clone();
+        if in_text_section {
+            if line == ".data" {
+                break;
             }
+            if line.contains(".globl") {
+                continue;
+            }
+            if line.ends_with(':') {
+                line.pop();
+                label_address_map.insert(line, line_count * 4);
+            } else {
+                let inst = parse_instruction(&line);
+                line_count += line_count_of(inst);
+            }
+        } else if line == ".text" {
+            in_text_section = true;
         }
     }
     label_address_map
@@ -1018,100 +1015,78 @@ enum State {
     InVariableData((String, usize)),
 }
 
-fn create_data_label_address_value_map(path: &str) -> HashMap<String, (usize, u32)> {
+type DataLabelAddressMap = HashMap<String, (usize, u32)>;
+type InitialDataValueMap = HashMap<usize, String>;
+
+fn create_data_label_address_value_map(
+    lines: &Vec<String>,
+) -> (DataLabelAddressMap, InitialDataValueMap, usize) {
     let mut label_address_map: HashMap<String, (usize, u32)> = HashMap::new();
-    match File::open(path) {
-        Err(e) => {
-            panic!("Failed in opening file ({}).", e);
-        }
-        Ok(file) => {
-            let mut state = State::None;
-            let reader = BufReader::new(file);
-            let mut variable_address = DATA_SECTION_ORIGIN;
-            for line in reader.lines() {
-                let mut line = remove_after_hash_or_semicolon(line.unwrap())
-                    .trim()
-                    .to_string();
-                if line.is_empty() {
-                    continue;
+    let mut initial_data_value_map: HashMap<usize, String> = HashMap::new();
+    let mut variable_address = DATA_SECTION_ORIGIN;
+    let mut state = State::None;
+    for line in lines {
+        let mut line = line.clone();
+        match state {
+            State::None => {
+                if line == ".data" {
+                    state = State::InDataSection;
+                } else if line == ".text" {
+                    state = State::InTextSection;
                 }
-                match state {
-                    State::None => {
-                        if line == ".data" {
-                            state = State::InDataSection;
-                        } else if line == ".text" {
-                            state = State::InTextSection;
-                        }
+            }
+            State::InTextSection => {
+                if line == ".data" {
+                    state = State::InDataSection;
+                }
+            }
+            State::InDataSection => {
+                if line.ends_with(':') {
+                    line.pop();
+                    state = State::InVariableData((line, variable_address));
+                } else if line == ".text" {
+                    break;
+                }
+            }
+            State::InVariableData((name, address)) => {
+                let splited_line = line.split_whitespace().collect::<Vec<&str>>();
+                assert_eq!(splited_line.len(), 2);
+                match splited_line[0] {
+                    ".long" => {
+                        let mut value_str = splited_line[1].to_string();
+                        initial_data_value_map.insert(address, value_str.clone());
+                        value_str = value_str[2..].to_string();
+                        let value = u32::from_str_radix(&value_str, 16).unwrap();
+                        label_address_map.insert(name.clone(), (address, value));
+                        variable_address += 4;
+                        state = State::InDataSection;
                     }
-                    State::InTextSection => {
-                        if line == ".data" {
-                            state = State::InDataSection;
-                        }
+                    ".space" => {
+                        let space_size = splited_line[1].parse::<usize>().unwrap();
+                        label_address_map.insert(name.clone(), (address, 0));
+                        variable_address += space_size;
+                        state = State::InDataSection;
                     }
-                    State::InDataSection => {
-                        if line.ends_with(':') {
-                            line.pop();
-                            state = State::InVariableData((line, variable_address));
-                        } else if line == ".text" {
-                            break;
-                        }
+                    ".globl" => {
+                        state = State::InVariableData((name, address));
                     }
-                    State::InVariableData((name, address)) => {
-                        let splited_line = line.split_whitespace().collect::<Vec<&str>>();
-                        assert_eq!(splited_line.len(), 2);
-                        match splited_line[0] {
-                            ".long" => {
-                                let mut value_str = splited_line[1].to_string();
-                                if value_str.starts_with("0x") {
-                                    value_str = value_str[2..].to_string();
-                                }
-                                let value = u32::from_str_radix(&value_str, 16).unwrap();
-                                label_address_map.insert(name.clone(), (address, value));
-                                variable_address += 4;
-                                state = State::InDataSection;
-                            }
-                            ".space" => {
-                                let space_size = splited_line[1].parse::<usize>().unwrap();
-                                label_address_map.insert(name.clone(), (address, 0));
-                                variable_address += space_size;
-                                state = State::InDataSection;
-                            }
-                            ".globl" => {
-                                state = State::InVariableData((name, address));
-                            }
-                            _ => {
-                                panic!("unexpected data: {}", line);
-                            }
-                        }
+                    _ => {
+                        panic!("unexpected data: {}", line);
                     }
                 }
             }
         }
     }
-    label_address_map
+    (label_address_map, initial_data_value_map, variable_address)
 }
 
-fn has_sections(path: &str) -> bool {
-    match File::open(path) {
-        Err(e) => {
-            panic!("Failed in opening file ({}).", e);
-        }
-        Ok(file) => {
-            let reader = BufReader::new(file);
-            for line in reader.lines() {
-                let line = remove_after_hash_or_semicolon(line.unwrap())
-                    .trim()
-                    .to_string();
-                if line.is_empty() {
-                    continue;
-                }
-                if line == ".text" || line == ".data" {
-                    return true;
-                }
-            }
-            false
+fn has_sections(lines: &Vec<String>) -> bool {
+    for line in lines {
+        if line == ".text" || line == ".data" {
+            return true;
         }
     }
+    false
 }
 
 fn output_data_section(
@@ -1141,24 +1116,14 @@ fn output_data_section(
     }
 }
 
-pub fn assemble(path: &str, style: &str) {
-    let has_sections = has_sections(path);
-    let text_label_address_map = create_text_label_address_map(path, has_sections);
-    let data_label_address_value_map = create_data_label_address_value_map(path);
-    output_data_section(path, &data_label_address_value_map, false);
+pub fn read_assembly_file(path: &str) -> Vec<String> {
+    let mut assembly_lines: Vec<String> = Vec::new();
     match File::open(path) {
         Err(e) => {
             panic!("Failed in opening file ({}).", e);
         }
         Ok(file) => {
-            let out_file_name = path
-                .trim_end_matches(path.split('.').last().unwrap_or(""))
-                .to_owned()
-                + style;
-            let mut out_file = File::create(out_file_name).unwrap();
             let reader = BufReader::new(file);
-            let mut line_count = 0;
-            let mut in_text_section = !has_sections;
             for line in reader.lines() {
                 let line = remove_after_hash_or_semicolon(line.unwrap())
                     .trim()
@@ -1166,61 +1131,113 @@ pub fn assemble(path: &str, style: &str) {
                 if line.is_empty() {
                     continue;
                 }
-                if !in_text_section {
-                    if line == ".text" {
-                        in_text_section = true;
-                    }
+                assembly_lines.push(line);
+            }
+        }
+    }
+    assembly_lines
+}
+
+pub fn assemble(path: &str, style: &str) {
+    let lines = read_assembly_file(path);
+    let has_sections = has_sections(&lines);
+    let (data_label_address_value_map, data_address_value_map, data_section_size) =
+        create_data_label_address_value_map(&lines);
+    let mut data_address_value_vec = data_address_value_map
+        .iter()
+        .collect::<Vec<(&usize, &String)>>();
+    data_address_value_vec.sort_by(|a, b| a.0.cmp(b.0));
+    let mut initialize_data_section_insts = Vec::new();
+    if !data_address_value_vec.is_empty() {
+        let (address, _) = data_address_value_vec[0];
+        let line = format!("li t0, {}", address);
+        initialize_data_section_insts.push(line);
+        let mut count = 0;
+        for (_, value_str) in data_address_value_vec {
+            let line = format!("li t1, {}", value_str.clone());
+            initialize_data_section_insts.push(line);
+            let line = format!("sw t1, {}(t0)", count);
+            initialize_data_section_insts.push(line);
+            count += 4;
+        }
+        initialize_data_section_insts.push(format!(
+            "li a1, {}",
+            data_section_size + DATA_SECTION_ORIGIN
+        ));
+    }
+    let text_section_start = if has_sections {
+        lines.iter().position(|line| line == ".text").unwrap()
+    } else {
+        0
+    };
+    let mut new_lines = lines[0..text_section_start + 1].to_vec();
+    new_lines.append(&mut initialize_data_section_insts);
+    new_lines.append(&mut lines[text_section_start + 1..].to_vec());
+    let lines = new_lines;
+    let text_label_address_map = create_text_label_address_map(&lines, has_sections);
+
+    output_data_section(path, &data_label_address_value_map, false);
+    let out_file_name = path
+        .trim_end_matches(path.split('.').last().unwrap_or(""))
+        .to_owned()
+        + style;
+    let mut out_file = File::create(out_file_name).unwrap();
+    let mut line_count = 0;
+    let mut in_text_section = !has_sections;
+    for line in lines {
+        if !in_text_section {
+            if line == ".text" {
+                in_text_section = true;
+            }
+        } else {
+            if line == ".data" {
+                break;
+            }
+            if line.ends_with(':') {
+                continue;
+            }
+            if line.contains(".globl") {
+                continue;
+            }
+            let inst = parse_instruction(&line);
+            let binary_lines = instruction_to_binary(
+                inst,
+                line_count * 4,
+                &text_label_address_map,
+                &data_label_address_value_map,
+            );
+            let binary_lines: Vec<&str> = binary_lines.split('\n').collect();
+            for binary in binary_lines {
+                if binary == "???" {
+                    panic!("unexpected instruction: {}", line);
                 } else {
-                    if line == ".data" {
-                        break;
-                    }
-                    if line.ends_with(':') {
-                        continue;
-                    }
-                    if line.contains(".globl") {
-                        continue;
-                    }
-                    let inst = parse_instruction(&line);
-                    let binary_lines = instruction_to_binary(
-                        inst,
-                        line_count * 4,
-                        &text_label_address_map,
-                        &data_label_address_value_map,
-                    );
-                    let binary_lines: Vec<&str> = binary_lines.split('\n').collect();
-                    for binary in binary_lines {
-                        if binary == "???" {
-                            panic!("unexpected instruction: {}", line);
-                        } else {
-                            let num: u32 = u32::from_str_radix(binary, 2).unwrap();
-                            match style {
-                                "2" => {
-                                    out_file.write_fmt(format_args!("{:>032b}\n", num)).unwrap();
-                                }
-                                "16" => {
-                                    out_file.write_fmt(format_args!("{:>08x}\n", num)).unwrap();
-                                }
-                                "ram" => {
-                                    out_file
-                                        .write_fmt(format_args!(
-                                            "RAM[{}] = 32'b{:>032b};\n",
-                                            line_count, num
-                                        ))
-                                        .unwrap();
-                                }
-                                _ => {
-                                    let bytes_to_write: [u8; 4] = [
-                                        (num & 0xff) as u8,
-                                        ((num >> 8) & 0xff) as u8,
-                                        ((num >> 16) & 0xff) as u8,
-                                        ((num >> 24) & 0xff) as u8,
-                                    ];
-                                    out_file.write_all(&bytes_to_write).unwrap();
-                                }
-                            }
-                            line_count += 1;
+                    let num: u32 = u32::from_str_radix(binary, 2).unwrap();
+                    match style {
+                        "2" => {
+                            out_file.write_fmt(format_args!("{:>032b}\n", num)).unwrap();
+                        }
+                        "16" => {
+                            out_file.write_fmt(format_args!("{:>08x}\n", num)).unwrap();
+                        }
+                        "ram" => {
+                            out_file
+                                .write_fmt(format_args!(
+                                    "RAM[{}] = 32'b{:>032b};\n",
+                                    line_count, num
+                                ))
+                                .unwrap();
+                        }
+                        _ => {
+                            let bytes_to_write: [u8; 4] = [
+                                (num & 0xff) as u8,
+                                ((num >> 8) & 0xff) as u8,
+                                ((num >> 16) & 0xff) as u8,
+                                ((num >> 24) & 0xff) as u8,
+                            ];
+                            out_file.write_all(&bytes_to_write).unwrap();
                         }
                     }
+                    line_count += 1;
                 }
             }
         }
