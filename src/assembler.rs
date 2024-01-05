@@ -684,7 +684,6 @@ fn instruction_to_binary(
         "li" | "la" => {
             assert_eq!(operands.len(), 2);
             let imm;
-            let mut two_lines_flag = false;
             if operands[1].len() >= 2 && &operands[1][0..2] == "0x" {
                 imm = u32_to_i32(u32::from_str_radix(&operands[1][2..], 16).unwrap());
             } else {
@@ -692,16 +691,14 @@ fn instruction_to_binary(
                 if let Ok(parsed_result) = parsed_result {
                     imm = parsed_result;
                 } else if let Some((address, _)) = data_label_address_map.get(&operands[1]) {
-                    two_lines_flag = true;
                     imm = *address as i32;
                 } else if let Some(address) = text_label_address_map.get(&operands[1]) {
-                    two_lines_flag = true;
                     imm = *address as i32;
                 } else {
                     panic!("label not found: {}", operands[1]);
                 }
             }
-            if -(2_i32.pow(12 - 1)) <= imm && imm <= 2_i32.pow(12 - 1) && !two_lines_flag {
+            if -(2_i32.pow(12 - 1)) <= imm && imm <= 2_i32.pow(12 - 1) {
                 let mut new_operands = vec![operands[0].clone()];
                 new_operands.push(String::from("x0"));
                 new_operands.push(imm.to_string());
@@ -883,25 +880,6 @@ fn instruction_to_binary(
             let new_operands = vec![String::from("ra"), operands[0].clone()];
             format_rd_label(&new_operands, 111, current_address, text_label_address_map)
         }
-        // "la" => {
-        //     let data_address = data_label_address_map.get(&operands[1]);
-        //     let imm = if data_address.is_some() {
-        //         data_address.unwrap().0
-        //     } else {
-        //         *text_label_address_map.get(&operands[1]).unwrap()
-        //     };
-        //     let mut first_new_operands = vec![String::from("ra")];
-        //     let mut second_new_operands = vec![operands[0].clone(), operands[0].clone()];
-        //     second_new_operands.push((imm & 4095).to_string());
-        //     if (imm & 4095) & (1 << 11) != 0 {
-        //         first_new_operands.push(((imm >> 12) + 1).to_string());
-        //     } else {
-        //         first_new_operands.push((imm >> 12).to_string());
-        //     }
-        //     let first = format_rd_upimm20(&first_new_operands, 23);
-        //     let second = format_rd_rs1_imm12(&second_new_operands, 0b000, 19);
-        //     format!("{}\n{}", first, second)
-        // }
         // additional instructions
         "absdiff" => format_rd_rs1_rs2(operands, 0b000, 0b0110000, 51),
         "abs" => {
@@ -923,7 +901,11 @@ fn instruction_to_binary(
     }
 }
 
-fn line_count_of(inst: Instruction) -> usize {
+fn line_count_of(
+    inst: Instruction,
+    text_label_address_map: &HashMap<String, usize>,
+    data_label_address_map: &HashMap<String, (usize, u32)>,
+) -> usize {
     let name: &str = &inst.name;
     let operands = &inst.operands;
     match name {
@@ -946,7 +928,24 @@ fn line_count_of(inst: Instruction) -> usize {
                 2
             }
         }
-        "la" => 2,
+        "la" => {
+            assert_eq!(operands.len(), 2);
+            if let Some(data_address) = text_label_address_map.get(&operands[1]) {
+                if *data_address <= 2_i32.pow(12 - 1) as usize {
+                    1
+                } else {
+                    2
+                }
+            } else if let Some((data_address, _)) = data_label_address_map.get(&operands[1]) {
+                if *data_address <= 2_i32.pow(12 - 1) as usize {
+                    1
+                } else {
+                    2
+                }
+            } else {
+                2
+            }
+        }
         "lb" | "lh" | "lw" => {
             assert_eq!(operands.len(), 2);
             if operands[1].find('(').is_none() {
@@ -981,31 +980,52 @@ fn remove_after_hash_or_semicolon(input: String) -> String {
 fn create_text_label_address_map(
     lines: &Vec<String>,
     section_exists: bool,
+    data_label_address_map: &HashMap<String, (usize, u32)>,
 ) -> HashMap<String, usize> {
-    let mut label_address_map: HashMap<String, usize> = HashMap::new();
-    let mut line_count = 0;
-    let mut in_text_section = !section_exists;
-    for line in lines {
-        let mut line = line.clone();
-        if in_text_section {
-            if line == ".data" {
+    let mut text_label_address_map: HashMap<String, usize> = HashMap::new();
+    loop {
+        let mut new_text_label_address_map: HashMap<String, usize> = HashMap::new();
+        let mut line_count = 0;
+        let mut in_text_section = !section_exists;
+        for line in lines {
+            let mut line = line.clone();
+            if in_text_section {
+                if line == ".data" {
+                    break;
+                }
+                if line.contains(".globl") {
+                    continue;
+                }
+                if line.ends_with(':') {
+                    line.pop();
+                    new_text_label_address_map.insert(line, line_count * 4);
+                } else {
+                    let inst = parse_instruction(&line);
+                    line_count +=
+                        line_count_of(inst, &text_label_address_map, data_label_address_map);
+                }
+            } else if line == ".text" {
+                in_text_section = true;
+            }
+        }
+        let mut convergence = true;
+        for (key, value) in new_text_label_address_map.iter() {
+            if let Some(old_value) = text_label_address_map.get(key) {
+                if old_value != value {
+                    convergence = false;
+                    break;
+                }
+            } else {
+                convergence = false;
                 break;
             }
-            if line.contains(".globl") {
-                continue;
-            }
-            if line.ends_with(':') {
-                line.pop();
-                label_address_map.insert(line, line_count * 4);
-            } else {
-                let inst = parse_instruction(&line);
-                line_count += line_count_of(inst);
-            }
-        } else if line == ".text" {
-            in_text_section = true;
         }
+        if convergence {
+            break;
+        }
+        text_label_address_map = new_text_label_address_map;
     }
-    label_address_map
+    text_label_address_map
 }
 
 enum State {
@@ -1015,14 +1035,14 @@ enum State {
     InVariableData((String, usize)),
 }
 
-type DataLabelAddressMap = HashMap<String, (usize, u32)>;
+type DataLabelAddressValueMap = HashMap<String, (usize, u32)>;
 type InitialDataValueMap = HashMap<usize, String>;
 
 fn create_data_label_address_value_map(
     lines: &Vec<String>,
-) -> (DataLabelAddressMap, InitialDataValueMap, usize) {
-    let mut label_address_map: HashMap<String, (usize, u32)> = HashMap::new();
-    let mut initial_data_value_map: HashMap<usize, String> = HashMap::new();
+) -> (DataLabelAddressValueMap, InitialDataValueMap, usize) {
+    let mut label_address_map: DataLabelAddressValueMap = HashMap::new();
+    let mut initial_data_value_map: InitialDataValueMap = HashMap::new();
     let mut variable_address = DATA_SECTION_ORIGIN;
     let mut state = State::None;
     for line in lines {
@@ -1091,7 +1111,7 @@ fn has_sections(lines: &Vec<String>) -> bool {
 
 fn output_data_section(
     path: &str,
-    data_label_address_value_map: &HashMap<String, (usize, u32)>,
+    data_label_address_value_map: &DataLabelAddressValueMap,
     show_label: bool,
 ) {
     let mut output_path = path.to_string();
@@ -1138,45 +1158,59 @@ pub fn read_assembly_file(path: &str) -> Vec<String> {
     assembly_lines
 }
 
+fn create_insts_initializing_data_section(
+    data_address_value_vec: &Vec<(&usize, &String)>,
+    data_section_size: usize,
+) -> Vec<String> {
+    let mut initialize_data_section_insts = Vec::new();
+    let (address, _) = data_address_value_vec[0];
+    let line = format!("li t0, {}", address);
+    initialize_data_section_insts.push(line);
+    let mut count = 0;
+    for &(_, value_str) in data_address_value_vec {
+        let line = format!("li t1, {}", value_str.clone());
+        initialize_data_section_insts.push(line);
+        let line = format!("sw t1, {}(t0)", count);
+        initialize_data_section_insts.push(line);
+        count += 4;
+    }
+    initialize_data_section_insts.push(format!(
+        "li a1, {}",
+        data_section_size + DATA_SECTION_ORIGIN
+    ));
+    initialize_data_section_insts
+}
+
 pub fn assemble(path: &str, style: &str) {
     let lines = read_assembly_file(path);
     let has_sections = has_sections(&lines);
     let (data_label_address_value_map, data_address_value_map, data_section_size) =
         create_data_label_address_value_map(&lines);
+    output_data_section(path, &data_label_address_value_map, false);
     let mut data_address_value_vec = data_address_value_map
         .iter()
         .collect::<Vec<(&usize, &String)>>();
     data_address_value_vec.sort_by(|a, b| a.0.cmp(b.0));
     let mut initialize_data_section_insts = Vec::new();
     if !data_address_value_vec.is_empty() {
-        let (address, _) = data_address_value_vec[0];
-        let line = format!("li t0, {}", address);
-        initialize_data_section_insts.push(line);
-        let mut count = 0;
-        for (_, value_str) in data_address_value_vec {
-            let line = format!("li t1, {}", value_str.clone());
-            initialize_data_section_insts.push(line);
-            let line = format!("sw t1, {}(t0)", count);
-            initialize_data_section_insts.push(line);
-            count += 4;
-        }
-        initialize_data_section_insts.push(format!(
-            "li a1, {}",
-            data_section_size + DATA_SECTION_ORIGIN
-        ));
+        initialize_data_section_insts =
+            create_insts_initializing_data_section(&data_address_value_vec, data_section_size);
     }
+
     let text_section_start = if has_sections {
         lines.iter().position(|line| line == ".text").unwrap()
     } else {
         0
     };
+
     let mut new_lines = lines[0..text_section_start + 1].to_vec();
     new_lines.append(&mut initialize_data_section_insts);
     new_lines.append(&mut lines[text_section_start + 1..].to_vec());
     let lines = new_lines;
-    let text_label_address_map = create_text_label_address_map(&lines, has_sections);
 
-    output_data_section(path, &data_label_address_value_map, false);
+    let text_label_address_map =
+        create_text_label_address_map(&lines, has_sections, &data_label_address_value_map);
+
     let out_file_name = path
         .trim_end_matches(path.split('.').last().unwrap_or(""))
         .to_owned()
