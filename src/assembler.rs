@@ -703,6 +703,10 @@ fn instruction_to_binary(
                 new_operands.push(String::from("x0"));
                 new_operands.push(imm.to_string());
                 format_rd_rs1_imm12(&new_operands, 0b000, 19)
+            } else if imm & 4095 == 0 {
+                let mut new_operands = vec![operands[0].clone()];
+                new_operands.push((imm >> 12).to_string());
+                format_rd_upimm20(&new_operands, 55)
             } else {
                 let mut first_new_operands = vec![operands[0].clone()];
                 let mut second_new_operands = vec![operands[0].clone(), operands[0].clone()];
@@ -922,7 +926,7 @@ fn line_count_of(
                     return 2;
                 }
             }
-            if -(2_i32.pow(12 - 1)) <= imm && imm <= 2_i32.pow(12 - 1) {
+            if -(2_i32.pow(12 - 1)) <= imm && imm <= 2_i32.pow(12 - 1) || imm & 4095 == 0 {
                 1
             } else {
                 2
@@ -931,13 +935,13 @@ fn line_count_of(
         "la" => {
             assert_eq!(operands.len(), 2);
             if let Some(data_address) = text_label_address_map.get(&operands[1]) {
-                if *data_address <= 2_i32.pow(12 - 1) as usize {
+                if *data_address <= 2_i32.pow(12 - 1) as usize || data_address & 4095 == 0 {
                     1
                 } else {
                     2
                 }
             } else if let Some((data_address, _)) = data_label_address_map.get(&operands[1]) {
-                if *data_address <= 2_i32.pow(12 - 1) as usize {
+                if *data_address <= 2_i32.pow(12 - 1) as usize || data_address & 4095 == 0 {
                     1
                 } else {
                     2
