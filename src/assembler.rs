@@ -142,7 +142,7 @@ fn format_float_register(reg: &str) -> String {
 
 fn imm12(value: &String) -> String {
     let value_i32 = if value.len() >= 2 && &value[0..2] == "0x" {
-        i32::from_str_radix(&value[2..], 16).unwrap()
+        u32_to_i32(u32::from_str_radix(&value[2..], 16).unwrap())
     } else {
         value.parse::<i32>().unwrap()
     };
@@ -153,7 +153,7 @@ fn imm12(value: &String) -> String {
 
 fn imm20(value: &String) -> String {
     let value_i32 = if value.len() >= 2 && &value[0..2] == "0x" {
-        i32::from_str_radix(&value[2..], 16).unwrap()
+        u32_to_i32(u32::from_str_radix(&value[2..], 16).unwrap())
     } else {
         value.parse::<i32>().unwrap()
     };
@@ -175,7 +175,7 @@ fn uimm5(value: &String) -> String {
 
 fn upimm20(value: &String) -> String {
     let value_i32 = if value.len() >= 2 && &value[0..2] == "0x" {
-        i32::from_str_radix(&value[2..], 16).unwrap()
+        u32_to_i32(u32::from_str_radix(&value[2..], 16).unwrap())
     } else {
         value.parse::<i32>().unwrap()
     };
