@@ -901,6 +901,7 @@ fn instruction_to_binary(
         "out7seg8" => format_rd(operands, 0b101, 115),
         "out7seg1" => format_rd(operands, 0b110, 115),
         "outled" => format_rd(operands, 0b111, 115),
+        "end" => format!("{:>032b}", 115),
         _ => String::from("???"),
     }
 }

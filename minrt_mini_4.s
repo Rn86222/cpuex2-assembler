@@ -189,7 +189,8 @@ l.12175:	# 0.16666668
 l.12173:	# 0.
 	.long	0x0
 .text
-	j min_caml_start
+	jal ra, min_caml_start
+	end
 .globl	min_caml_create_array
 min_caml_create_array:
   mv	t0,a0
