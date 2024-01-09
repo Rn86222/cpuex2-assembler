@@ -1221,10 +1221,16 @@ pub fn assemble(path: &str, style: &str) {
         .to_owned()
         + style;
     let mut out_file = File::create(out_file_name).unwrap();
+    let asmpc_file_name = path
+        .trim_end_matches(path.split('.').last().unwrap_or(""))
+        .to_owned()
+        + "pc.asm";
+    let mut asmpc_file = File::create(asmpc_file_name).unwrap();
     let mut line_count = 0;
     let mut in_text_section = !has_sections;
     for line in lines {
         if !in_text_section {
+            asmpc_file.write_fmt(format_args!("{}\n", line)).unwrap();
             if line == ".text" {
                 in_text_section = true;
             }
@@ -1233,11 +1239,16 @@ pub fn assemble(path: &str, style: &str) {
                 break;
             }
             if line.ends_with(':') {
+                asmpc_file.write_fmt(format_args!("{}\n", line)).unwrap();
                 continue;
             }
             if line.contains(".globl") {
+                asmpc_file.write_fmt(format_args!("{}\n", line)).unwrap();
                 continue;
             }
+            asmpc_file
+                .write_fmt(format_args!("\t{} # PC {}\n", line, line_count * 4))
+                .unwrap();
             let inst = parse_instruction(&line);
             let binary_lines = instruction_to_binary(
                 inst,
