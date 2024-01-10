@@ -1180,7 +1180,7 @@ fn create_insts_initializing_data_section(
         count += 4;
     }
     initialize_data_section_insts.push(format!(
-        "li a1, {}",
+        "li s11, {}",
         data_section_size + DATA_SECTION_ORIGIN
     ));
     initialize_data_section_insts
