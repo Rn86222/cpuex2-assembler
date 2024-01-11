@@ -130,13 +130,13 @@ fn format_float_register(reg: &str) -> String {
             assert!(index <= 7);
             format!("{:>05b}", index + 10)
         }
-        "f" => {
+        _ => {
+            assert!(&reg[0..1] == "f");
             reg = reg.replace('f', "");
             let index = reg.parse::<u8>().unwrap();
             assert!(index <= 31);
             format!("{:>05b}", index)
         }
-        _ => unreachable!("float register format error"),
     }
 }
 
