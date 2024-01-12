@@ -284,6 +284,7 @@ fn rs1_rs2_label(
     let rs2 = format_int_register(&operands[1]);
     let jump_address = *label_address_map.get(&operands[2]).unwrap();
     let mut jump_offset = jump_address as i32 - current_address as i32;
+    assert!(((-(1 << 12))..(1 << 12)).contains(&jump_offset));
     jump_offset >>= 1;
     let imm12 = imm12(&jump_offset.to_string());
     let imm_12 = imm12[0..1].to_string();
@@ -304,11 +305,59 @@ fn format_rs1_rs2_label(
     current_address: usize,
     label_address_map: &HashMap<String, usize>,
 ) -> String {
-    format!(
-        "{}{:>07b}",
-        rs1_rs2_label(operands, funct3, current_address, label_address_map),
-        op
-    )
+    let jump_address = *label_address_map.get(&operands[2]).unwrap();
+    let jump_offset = jump_address as i32 - current_address as i32;
+    if (-(1 << 12)..(1 << 12)).contains(&jump_offset) {
+        format!(
+            "{}{:>07b}",
+            rs1_rs2_label(operands, funct3, current_address, label_address_map),
+            op
+        )
+    } else {
+        assert_eq!(operands.len(), 3);
+        let beq_rs1 = format_int_register(&operands[0]);
+        let beq_rs2 = format_int_register(&operands[1]);
+        let mut beq_jump_offset = 8;
+        beq_jump_offset >>= 1;
+        let imm12 = imm12(&beq_jump_offset.to_string());
+        let imm_12 = imm12[0..1].to_string();
+        let imm_11 = imm12[1..2].to_string();
+        let imm_10_5 = imm12[2..8].to_string();
+        let imm_4_1 = imm12[8..12].to_string();
+        let funct3 = format!("{:>03b}", funct3);
+        let branch = format!(
+            "{}{}{}{}{}{}{}{:>07b}",
+            imm_12, imm_10_5, beq_rs2, beq_rs1, funct3, imm_4_1, imm_11, op
+        );
+        let jal_rd = format_int_register("zero");
+        let mut tmp_jump_offset = 16;
+        tmp_jump_offset >>= 1;
+        let imm19 = imm20(&tmp_jump_offset.to_string());
+        let imm_20 = imm19[0..1].to_string();
+        let imm_19_12 = imm19[1..9].to_string();
+        let imm_11 = imm19[9..10].to_string();
+        let imm_10_1 = imm19[10..20].to_string();
+        let jal = format!(
+            "{}{}{}{}{}{:>07b}",
+            imm_20, imm_10_1, imm_11, imm_19_12, jal_rd, 111
+        );
+        let mut lui_operands = vec!["gp".to_string()];
+        let mut addi_new_operands = vec!["gp".to_string(), "gp".to_string()];
+        addi_new_operands.push((jump_address & 4095).to_string());
+        if (jump_address & 4095) & (1 << 11) != 0 {
+            lui_operands.push(((jump_address >> 12) + 1).to_string());
+        } else {
+            lui_operands.push((jump_address >> 12).to_string());
+        }
+        let lui = format_rd_upimm20(&lui_operands, 55);
+        let addi = format_rd_rs1_imm12(&addi_new_operands, 0b000, 19);
+        let jalr = format_rd_rs1_imm12(
+            &vec!["zero".to_string(), "gp".to_string(), "0".to_string()],
+            0b000,
+            103,
+        );
+        format!("{}\n{}\n{}\n{}\n{}", branch, jal, lui, addi, jalr)
+    }
 }
 
 fn rd_label(
@@ -910,6 +959,7 @@ fn line_count_of(
     inst: Instruction,
     text_label_address_map: &HashMap<String, usize>,
     data_label_address_map: &HashMap<String, (usize, u32)>,
+    line_count: usize,
 ) -> usize {
     let name: &str = &inst.name;
     let operands = &inst.operands;
@@ -935,8 +985,8 @@ fn line_count_of(
         }
         "la" => {
             assert_eq!(operands.len(), 2);
-            if let Some(data_address) = text_label_address_map.get(&operands[1]) {
-                if *data_address <= 2_i32.pow(12 - 1) as usize || data_address & 4095 == 0 {
+            if let Some(text_address) = text_label_address_map.get(&operands[1]) {
+                if *text_address <= 2_i32.pow(12 - 1) as usize || text_address & 4095 == 0 {
                     1
                 } else {
                     2
@@ -949,6 +999,32 @@ fn line_count_of(
                 }
             } else {
                 2
+            }
+        }
+        "beq" | "bne" | "blt" | "bge" | "bltu" | "bgeu" | "ble" | "bgt" | "bleu" | "bgtu" => {
+            assert_eq!(operands.len(), 3);
+            if let Some(text_address) = text_label_address_map.get(&operands[2]) {
+                let offset = *text_address as i32 - line_count as i32 * 4;
+                if (-(1 << 12)..(1 << 12)).contains(&offset) {
+                    1
+                } else {
+                    5
+                }
+            } else {
+                5
+            }
+        }
+        "beqz" | "bnez" | "blez" | "bgez" | "bltz" | "bgtz" => {
+            assert_eq!(operands.len(), 2);
+            if let Some(text_address) = text_label_address_map.get(&operands[1]) {
+                let offset = *text_address as i32 - line_count as i32 * 4;
+                if (-(1 << 12)..(1 << 12)).contains(&offset) {
+                    1
+                } else {
+                    5
+                }
+            } else {
+                5
             }
         }
         "lb" | "lh" | "lw" => {
@@ -988,7 +1064,11 @@ fn create_text_label_address_map(
     data_label_address_map: &HashMap<String, (usize, u32)>,
 ) -> HashMap<String, usize> {
     let mut text_label_address_map: HashMap<String, usize> = HashMap::new();
+    let mut iter = 0;
+    eprintln!("Creating label address map...");
     loop {
+        eprint!("\riter = {iter}");
+        iter += 1;
         let mut new_text_label_address_map: HashMap<String, usize> = HashMap::new();
         let mut line_count = 0;
         let mut in_text_section = !section_exists;
@@ -1006,8 +1086,12 @@ fn create_text_label_address_map(
                     new_text_label_address_map.insert(line, line_count * 4);
                 } else {
                     let inst = parse_instruction(&line);
-                    line_count +=
-                        line_count_of(inst, &text_label_address_map, data_label_address_map);
+                    line_count += line_count_of(
+                        inst,
+                        &text_label_address_map,
+                        data_label_address_map,
+                        line_count,
+                    );
                 }
             } else if line == ".text" {
                 in_text_section = true;
@@ -1030,6 +1114,7 @@ fn create_text_label_address_map(
         }
         text_label_address_map = new_text_label_address_map;
     }
+    eprintln!();
     text_label_address_map
 }
 
