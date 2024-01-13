@@ -189,8 +189,8 @@ l.12175:	# 0.16666668
 l.12173:	# 0.
 	.long	0x0
 .text
-#  jal ra,min_caml_start
-	j min_caml_start
+ jal ra,min_caml_start
+  end
 .globl	min_caml_create_array
 min_caml_create_array:
   mv	t0,a0
@@ -10129,7 +10129,6 @@ min_caml_start:
 	sw	s11, 4(sp)
 	sw	s0, 0(sp)
 	addi	s0, sp, 0
-	addi	s11, a1, 0
 	la	a0, min_caml_light_dirvec
 	la	a1, min_caml_light_dirvec_v3
 	la	a2, min_caml_light_dirvec_consts
