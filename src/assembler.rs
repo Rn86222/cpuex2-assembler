@@ -317,8 +317,7 @@ fn format_rs1_rs2_label(
         assert_eq!(operands.len(), 3);
         let beq_rs1 = format_int_register(&operands[0]);
         let beq_rs2 = format_int_register(&operands[1]);
-        let mut beq_jump_offset = 8;
-        beq_jump_offset >>= 1;
+        let beq_jump_offset = 8 >> 1;
         let imm12 = imm12(&beq_jump_offset.to_string());
         let imm_12 = imm12[0..1].to_string();
         let imm_11 = imm12[1..2].to_string();
@@ -329,34 +328,29 @@ fn format_rs1_rs2_label(
             "{}{}{}{}{}{}{}{:>07b}",
             imm_12, imm_10_5, beq_rs2, beq_rs1, funct3, imm_4_1, imm_11, op
         );
-        let jal_rd = format_int_register("zero");
-        let mut tmp_jump_offset = 16;
-        tmp_jump_offset >>= 1;
-        let imm19 = imm20(&tmp_jump_offset.to_string());
+        let jal1_rd = format_int_register("zero");
+        let jal1_offset = 8 >> 1;
+        let imm19 = imm20(&jal1_offset.to_string());
         let imm_20 = imm19[0..1].to_string();
         let imm_19_12 = imm19[1..9].to_string();
         let imm_11 = imm19[9..10].to_string();
         let imm_10_1 = imm19[10..20].to_string();
-        let jal = format!(
+        let jal1 = format!(
             "{}{}{}{}{}{:>07b}",
-            imm_20, imm_10_1, imm_11, imm_19_12, jal_rd, 111
+            imm_20, imm_10_1, imm_11, imm_19_12, jal1_rd, 111
         );
-        let mut lui_operands = vec!["gp".to_string()];
-        let mut addi_new_operands = vec!["gp".to_string(), "gp".to_string()];
-        addi_new_operands.push((jump_address & 4095).to_string());
-        if (jump_address & 4095) & (1 << 11) != 0 {
-            lui_operands.push(((jump_address >> 12) + 1).to_string());
-        } else {
-            lui_operands.push((jump_address >> 12).to_string());
-        }
-        let lui = format_rd_upimm20(&lui_operands, 55);
-        let addi = format_rd_rs1_imm12(&addi_new_operands, 0b000, 19);
-        let jalr = format_rd_rs1_imm12(
-            &vec!["zero".to_string(), "gp".to_string(), "0".to_string()],
-            0b000,
-            103,
+        let jal2_rd = format_int_register("zero");
+        let jal2_offset = (jump_offset - 8) >> 1;
+        let imm19 = imm20(&jal2_offset.to_string());
+        let imm_20 = imm19[0..1].to_string();
+        let imm_19_12 = imm19[1..9].to_string();
+        let imm_11 = imm19[9..10].to_string();
+        let imm_10_1 = imm19[10..20].to_string();
+        let jal2 = format!(
+            "{}{}{}{}{}{:>07b}",
+            imm_20, imm_10_1, imm_11, imm_19_12, jal2_rd, 111
         );
-        format!("{}\n{}\n{}\n{}\n{}", branch, jal, lui, addi, jalr)
+        format!("{}\n{}\n{}", branch, jal1, jal2)
     }
 }
 
@@ -1008,10 +1002,10 @@ fn line_count_of(
                 if (-(1 << 12)..(1 << 12)).contains(&offset) {
                     1
                 } else {
-                    5
+                    3
                 }
             } else {
-                5
+                3
             }
         }
         "beqz" | "bnez" | "blez" | "bgez" | "bltz" | "bgtz" => {
@@ -1021,10 +1015,10 @@ fn line_count_of(
                 if (-(1 << 12)..(1 << 12)).contains(&offset) {
                     1
                 } else {
-                    5
+                    3
                 }
             } else {
-                5
+                3
             }
         }
         "lb" | "lh" | "lw" => {
@@ -1065,7 +1059,7 @@ fn create_text_label_address_map(
 ) -> HashMap<String, usize> {
     let mut text_label_address_map: HashMap<String, usize> = HashMap::new();
     let mut iter = 0;
-    eprintln!("Creating label address map...");
+    eprintln!("Creating text label address map...");
     loop {
         eprint!("\riter = {iter}");
         iter += 1;
@@ -1131,6 +1125,7 @@ type InitialDataValueMap = HashMap<usize, String>;
 fn create_data_label_address_value_map(
     lines: &Vec<String>,
 ) -> (DataLabelAddressValueMap, InitialDataValueMap, usize) {
+    println!("Creating data label address map...");
     let mut label_address_map: DataLabelAddressValueMap = HashMap::new();
     let mut initial_data_value_map: InitialDataValueMap = HashMap::new();
     let mut variable_address = DATA_SECTION_ORIGIN;
@@ -1204,6 +1199,7 @@ fn output_data_section(
     data_label_address_value_map: &DataLabelAddressValueMap,
     show_label: bool,
 ) {
+    println!("Outputting data section...");
     let mut output_path = path.to_string();
     output_path.truncate(output_path.rfind('.').unwrap_or(output_path.len()));
     output_path.push_str(".data");
@@ -1252,6 +1248,7 @@ fn create_insts_initializing_data_section(
     data_address_value_vec: &Vec<(&usize, &String)>,
     data_section_size: usize,
 ) -> Vec<String> {
+    println!("Creating instructions initializing data section...");
     let mut initialize_data_section_insts = Vec::new();
     let (address, _) = data_address_value_vec[0];
     let line = format!("li t0, {}", address);
@@ -1313,6 +1310,7 @@ pub fn assemble(path: &str, style: &str) {
     let mut asmpc_file = File::create(asmpc_file_name).unwrap();
     let mut line_count = 0;
     let mut in_text_section = !has_sections;
+    println!("Assembling...");
     for line in lines {
         if !in_text_section {
             asmpc_file.write_fmt(format_args!("{}\n", line)).unwrap();
@@ -1377,4 +1375,5 @@ pub fn assemble(path: &str, style: &str) {
             }
         }
     }
+    println!("Done.");
 }
