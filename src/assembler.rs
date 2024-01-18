@@ -1168,6 +1168,9 @@ fn create_data_label_address_value_map(
                     }
                     ".space" => {
                         let space_size = splited_line[1].parse::<usize>().unwrap();
+                        for i in 0..space_size / 4 {
+                            initial_data_value_map.insert(address + i * 4, String::from("0x0"));
+                        }
                         label_address_map.insert(name.clone(), (address, 0));
                         variable_address += space_size;
                         state = State::InDataSection;
@@ -1255,10 +1258,15 @@ fn create_insts_initializing_data_section(
     initialize_data_section_insts.push(line);
     let mut count = 0;
     for &(_, value_str) in data_address_value_vec {
-        let line = format!("li t1, {}", value_str.clone());
-        initialize_data_section_insts.push(line);
-        let line = format!("sw t1, {}(t0)", count);
-        initialize_data_section_insts.push(line);
+        if value_str == "0x0" {
+            let line = format!("sw x0, {}(t0)", count);
+            initialize_data_section_insts.push(line);
+        } else {
+            let line = format!("li t1, {}", value_str.clone());
+            initialize_data_section_insts.push(line);
+            let line = format!("sw t1, {}(t0)", count);
+            initialize_data_section_insts.push(line);
+        }
         count += 4;
     }
     initialize_data_section_insts.push(format!(
