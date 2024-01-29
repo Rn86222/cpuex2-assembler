@@ -10,6 +10,17 @@ Options:
   -V, --version        Print version
 ```
 
+## コンパイラ係向け
+実行環境は WSL2 を推奨します。  
+コンパイラが出力した `minrt.s` をこの `README.md` と同じディレクトリに置いてください。
+また `make` および `cargo` がインストールされていることを確認してください。その状態で
+```sh
+$ make run
+```
+を実行すると、`minrt.s` がアセンブルされ、バイナリファイル `minrt.bin` が生成されます。
+このバイナリファイルをシミュレータのディレクトリにコピーしてください。
+なお `minrt.bin` 以外にも2つのファイル (`minrt.data` と `minrt.pc.asm`) が生成されますが、これらはシミュレータには必要ないので無視してもらって大丈夫です。
+
 ## Example
 You can assemble assembly code including `.data` section and `.text` section such as the following.  
 You can use `#` or `;` to write comments.
