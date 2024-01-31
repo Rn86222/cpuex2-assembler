@@ -315,10 +315,10 @@ fn format_rs1_rs2_label(
         )
     } else {
         assert_eq!(operands.len(), 3);
-        let beq_rs1 = format_int_register(&operands[0]);
-        let beq_rs2 = format_int_register(&operands[1]);
-        let beq_jump_offset = 8 >> 1;
-        let imm12 = imm12(&beq_jump_offset.to_string());
+        let branch_rs1 = format_int_register(&operands[0]);
+        let branch_rs2 = format_int_register(&operands[1]);
+        let branch_jump_offset = 8 >> 1;
+        let imm12 = imm12(&branch_jump_offset.to_string());
         let imm_12 = imm12[0..1].to_string();
         let imm_11 = imm12[1..2].to_string();
         let imm_10_5 = imm12[2..8].to_string();
@@ -326,7 +326,88 @@ fn format_rs1_rs2_label(
         let funct3 = format!("{:>03b}", funct3);
         let branch = format!(
             "{}{}{}{}{}{}{}{:>07b}",
-            imm_12, imm_10_5, beq_rs2, beq_rs1, funct3, imm_4_1, imm_11, op
+            imm_12, imm_10_5, branch_rs2, branch_rs1, funct3, imm_4_1, imm_11, op
+        );
+        let jal1_rd = format_int_register("zero");
+        let jal1_offset = 8 >> 1;
+        let imm19 = imm20(&jal1_offset.to_string());
+        let imm_20 = imm19[0..1].to_string();
+        let imm_19_12 = imm19[1..9].to_string();
+        let imm_11 = imm19[9..10].to_string();
+        let imm_10_1 = imm19[10..20].to_string();
+        let jal1 = format!(
+            "{}{}{}{}{}{:>07b}",
+            imm_20, imm_10_1, imm_11, imm_19_12, jal1_rd, 111
+        );
+        let jal2_rd = format_int_register("zero");
+        let jal2_offset = (jump_offset - 8) >> 1;
+        let imm19 = imm20(&jal2_offset.to_string());
+        let imm_20 = imm19[0..1].to_string();
+        let imm_19_12 = imm19[1..9].to_string();
+        let imm_11 = imm19[9..10].to_string();
+        let imm_10_1 = imm19[10..20].to_string();
+        let jal2 = format!(
+            "{}{}{}{}{}{:>07b}",
+            imm_20, imm_10_1, imm_11, imm_19_12, jal2_rd, 111
+        );
+        format!("{}\n{}\n{}", branch, jal1, jal2)
+    }
+}
+
+fn fs1_fs2_label(
+    operands: &Vec<String>,
+    funct3: u8,
+    current_address: usize,
+    label_address_map: &HashMap<String, usize>,
+) -> String {
+    assert_eq!(operands.len(), 3);
+    let rs1 = format_float_register(&operands[0]);
+    let rs2 = format_float_register(&operands[1]);
+    let jump_address = *label_address_map.get(&operands[2]).unwrap();
+    let mut jump_offset = jump_address as i32 - current_address as i32;
+    assert!(((-(1 << 12))..(1 << 12)).contains(&jump_offset));
+    jump_offset >>= 1;
+    let imm12 = imm12(&jump_offset.to_string());
+    let imm_12 = imm12[0..1].to_string();
+    let imm_11 = imm12[1..2].to_string();
+    let imm_10_5 = imm12[2..8].to_string();
+    let imm_4_1 = imm12[8..12].to_string();
+    let funct3 = format!("{:>03b}", funct3);
+    format!(
+        "{}{}{}{}{}{}{}",
+        imm_12, imm_10_5, rs2, rs1, funct3, imm_4_1, imm_11
+    )
+}
+
+fn format_fs1_fs2_label(
+    operands: &Vec<String>,
+    funct3: u8,
+    op: u8,
+    current_address: usize,
+    label_address_map: &HashMap<String, usize>,
+) -> String {
+    let jump_address = *label_address_map.get(&operands[2]).unwrap();
+    let jump_offset = jump_address as i32 - current_address as i32;
+    if (-(1 << 12)..(1 << 12)).contains(&jump_offset) {
+        format!(
+            "{}{:>07b}",
+            fs1_fs2_label(operands, funct3, current_address, label_address_map),
+            op
+        )
+    } else {
+        assert_eq!(operands.len(), 3);
+        let branch_fs1 = format_float_register(&operands[0]);
+        let branch_fs2 = format_float_register(&operands[1]);
+        let branch_jump_offset = 8 >> 1;
+        let imm12 = imm12(&branch_jump_offset.to_string());
+        let imm_12 = imm12[0..1].to_string();
+        let imm_11 = imm12[1..2].to_string();
+        let imm_10_5 = imm12[2..8].to_string();
+        let imm_4_1 = imm12[8..12].to_string();
+        let funct3 = format!("{:>03b}", funct3);
+        let branch = format!(
+            "{}{}{}{}{}{}{}{:>07b}",
+            imm_12, imm_10_5, branch_fs2, branch_fs1, funct3, imm_4_1, imm_11, op
         );
         let jal1_rd = format_int_register("zero");
         let jal1_offset = 8 >> 1;
@@ -707,6 +788,48 @@ fn instruction_to_binary(
         "bgeu" => {
             format_rs1_rs2_label(operands, 0b111, 99, current_address, text_label_address_map)
         }
+        "fbeq" => format_fs1_fs2_label(
+            operands,
+            0b000,
+            100,
+            current_address,
+            text_label_address_map,
+        ),
+        "fbne" => format_fs1_fs2_label(
+            operands,
+            0b001,
+            100,
+            current_address,
+            text_label_address_map,
+        ),
+        "fblt" => format_fs1_fs2_label(
+            operands,
+            0b100,
+            100,
+            current_address,
+            text_label_address_map,
+        ),
+        "fbge" => format_fs1_fs2_label(
+            operands,
+            0b101,
+            100,
+            current_address,
+            text_label_address_map,
+        ),
+        "fbltu" => format_fs1_fs2_label(
+            operands,
+            0b110,
+            100,
+            current_address,
+            text_label_address_map,
+        ),
+        "fbgeu" => format_fs1_fs2_label(
+            operands,
+            0b111,
+            100,
+            current_address,
+            text_label_address_map,
+        ),
         "jalr" => format_rd_rs1_imm12(operands, 0b000, 103),
         "jal" => format_rd_label(operands, 111, current_address, text_label_address_map),
         // TODO: how to decide rounding mode? (funct3)
@@ -936,6 +1059,146 @@ fn instruction_to_binary(
                 text_label_address_map,
             )
         }
+        "fbeqz" => {
+            let new_operands = vec![
+                operands[0].clone(),
+                String::from("ft0"),
+                operands[1].clone(),
+            ];
+            format_fs1_fs2_label(
+                &new_operands,
+                0b000,
+                100,
+                current_address,
+                text_label_address_map,
+            )
+        }
+        "fbnez" => {
+            let new_operands = vec![
+                operands[0].clone(),
+                String::from("ft0"),
+                operands[1].clone(),
+            ];
+            format_fs1_fs2_label(
+                &new_operands,
+                0b001,
+                100,
+                current_address,
+                text_label_address_map,
+            )
+        }
+        "fblez" => {
+            let new_operands = vec![
+                String::from("ft0"),
+                operands[0].clone(),
+                operands[1].clone(),
+            ];
+            format_fs1_fs2_label(
+                &new_operands,
+                0b101,
+                100,
+                current_address,
+                text_label_address_map,
+            )
+        }
+        "fbgez" => {
+            let new_operands = vec![
+                operands[0].clone(),
+                String::from("ft0"),
+                operands[1].clone(),
+            ];
+            format_fs1_fs2_label(
+                &new_operands,
+                0b101,
+                100,
+                current_address,
+                text_label_address_map,
+            )
+        }
+        "fbltz" => {
+            let new_operands = vec![
+                operands[0].clone(),
+                String::from("ft0"),
+                operands[1].clone(),
+            ];
+            format_fs1_fs2_label(
+                &new_operands,
+                0b100,
+                100,
+                current_address,
+                text_label_address_map,
+            )
+        }
+        "fbgtz" => {
+            let new_operands = vec![
+                String::from("ft0"),
+                operands[0].clone(),
+                operands[1].clone(),
+            ];
+            format_rs1_rs2_label(
+                &new_operands,
+                0b100,
+                100,
+                current_address,
+                text_label_address_map,
+            )
+        }
+        "fble" => {
+            let new_operands = vec![
+                operands[1].clone(),
+                operands[0].clone(),
+                operands[2].clone(),
+            ];
+            format_fs1_fs2_label(
+                &new_operands,
+                0b101,
+                100,
+                current_address,
+                text_label_address_map,
+            )
+        }
+        "fbgt" => {
+            let new_operands = vec![
+                operands[1].clone(),
+                operands[0].clone(),
+                operands[2].clone(),
+            ];
+            format_fs1_fs2_label(
+                &new_operands,
+                0b100,
+                100,
+                current_address,
+                text_label_address_map,
+            )
+        }
+        "fbleu" => {
+            let new_operands = vec![
+                operands[1].clone(),
+                operands[0].clone(),
+                operands[2].clone(),
+            ];
+            format_fs1_fs2_label(
+                &new_operands,
+                0b111,
+                100,
+                current_address,
+                text_label_address_map,
+            )
+        }
+        "fbgtu" => {
+            let new_operands = vec![
+                operands[1].clone(),
+                operands[0].clone(),
+                operands[2].clone(),
+            ];
+            format_fs1_fs2_label(
+                &new_operands,
+                0b110,
+                100,
+                current_address,
+                text_label_address_map,
+            )
+        }
         "j" => {
             let new_operands = vec![String::from("x0"), operands[0].clone()];
             format_rd_label(&new_operands, 111, current_address, text_label_address_map)
@@ -1020,7 +1283,9 @@ fn line_count_of(
                 2
             }
         }
-        "beq" | "bne" | "blt" | "bge" | "bltu" | "bgeu" | "ble" | "bgt" | "bleu" | "bgtu" => {
+        "beq" | "bne" | "blt" | "bge" | "bltu" | "bgeu" | "ble" | "bgt" | "bleu" | "bgtu"
+        | "fbeq" | "fbne" | "fblt" | "fbge" | "fbltu" | "fbgeu" | "fble" | "fbgt" | "fbleu"
+        | "fbgtu" => {
             assert_eq!(operands.len(), 3);
             if let Some(text_address) = text_label_address_map.get(&operands[2]) {
                 let offset = *text_address as i32 - line_count as i32 * 4;
@@ -1033,7 +1298,8 @@ fn line_count_of(
                 3
             }
         }
-        "beqz" | "bnez" | "blez" | "bgez" | "bltz" | "bgtz" => {
+        "beqz" | "bnez" | "blez" | "bgez" | "bltz" | "bgtz" | "fbeqz" | "fbnez" | "fblez"
+        | "fbgez" | "fbltz" | "fbgtz" => {
             assert_eq!(operands.len(), 2);
             if let Some(text_address) = text_label_address_map.get(&operands[1]) {
                 let offset = *text_address as i32 - line_count as i32 * 4;
