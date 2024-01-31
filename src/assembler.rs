@@ -540,14 +540,40 @@ fn format_fs2_imm12rs1(operands: &Vec<String>, funct3: u8, op: u8) -> String {
 fn rd(operands: &Vec<String>, funct3: u8) -> String {
     assert_eq!(operands.len(), 1);
     let imm = format!("{:>012}", 0);
-    let rd = format!("{:>05}", 0);
-    let rs1 = format_int_register(&operands[0]);
+    let rd = format_int_register(&operands[0]);
+    let rs1 = format!("{:>05}", 0);
     let funct3 = format!("{:>03b}", funct3);
     format!("{}{}{}{}", imm, rs1, funct3, rd)
 }
 
 fn format_rd(operands: &Vec<String>, funct3: u8, op: u8) -> String {
     format!("{}{:>07b}", rd(operands, funct3), op)
+}
+
+fn fd(operands: &Vec<String>, funct3: u8) -> String {
+    assert_eq!(operands.len(), 1);
+    let imm = format!("{:>012}", 0);
+    let fd = format_float_register(&operands[0]);
+    let rs1 = format!("{:>05}", 0);
+    let funct3 = format!("{:>03b}", funct3);
+    format!("{}{}{}{}", imm, rs1, funct3, fd)
+}
+
+fn format_fd(operands: &Vec<String>, funct3: u8, op: u8) -> String {
+    format!("{}{:>07b}", fd(operands, funct3), op)
+}
+
+fn rs1(operands: &Vec<String>, funct3: u8) -> String {
+    assert_eq!(operands.len(), 1);
+    let imm = format!("{:>012}", 0);
+    let rd = format!("{:>05}", 0);
+    let rs1 = format_int_register(&operands[0]);
+    let funct3 = format!("{:>03b}", funct3);
+    format!("{}{}{}{}", imm, rs1, funct3, rd)
+}
+
+fn format_rs1(operands: &Vec<String>, funct3: u8, op: u8) -> String {
+    format!("{}{:>07b}", rs1(operands, funct3), op)
 }
 
 fn resolve_load_address_symbol(
@@ -939,11 +965,10 @@ fn instruction_to_binary(
         "notxor" => format_rd_rs1_rs2(operands, 0b100, 0b0000011, 51),
         "notor" => format_rd_rs1_rs2(operands, 0b100, 0b0000100, 51),
         "andnot" => format_rd_rs1_rs2(operands, 0b100, 0b0000101, 51),
-        "in" => format_rd(operands, 0b000, 115),
-        "outuart" => format_rd(operands, 0b100, 115),
-        "out7seg8" => format_rd(operands, 0b101, 115),
-        "out7seg1" => format_rd(operands, 0b110, 115),
-        "outled" => format_rd(operands, 0b111, 115),
+        "in" => format_rd(operands, 0b000, 116),
+        "fin" => format_fd(operands, 0b001, 116),
+        "outchar" => format_rs1(operands, 0b000, 117),
+        "outint" => format_rs1(operands, 0b001, 117),
         "end" => format!("{:>032b}", 115),
         _ => String::from("???"),
     }
