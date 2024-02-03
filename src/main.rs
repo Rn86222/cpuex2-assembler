@@ -1,5 +1,6 @@
 use assembler::*;
 mod assembler;
+mod constants;
 use clap::Parser;
 
 /// Assembler for 2023 CPU-Ex Group2
