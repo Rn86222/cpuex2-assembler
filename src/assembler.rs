@@ -92,7 +92,7 @@ fn format_int_register(reg: &str) -> String {
                 }
                 "x" => {
                     let index = reg.parse::<u8>().unwrap();
-                    assert!(index <= 31);
+                    assert!(index <= 63);
                     format!("{:>0REG_WIDTH$b}", index)
                 }
                 _ => unreachable!("int register format error"),
@@ -136,7 +136,7 @@ fn format_float_register(reg: &str) -> String {
             assert!(&reg[0..1] == "f");
             reg = reg.replace('f', "");
             let index = reg.parse::<u8>().unwrap();
-            assert!(index <= 31);
+            assert!(index <= 63);
             format!("{:>0REG_WIDTH$b}", index)
         }
     }
@@ -328,7 +328,7 @@ fn format_rs1_rs2_label(
         assert_eq!(operands.len(), 3);
         let branch_rs1 = format_int_register(&operands[0]);
         let branch_rs2 = format_int_register(&operands[1]);
-        let branch_jump_offset = 8 >> 1;
+        let branch_jump_offset = 8 >> 2;
         let imm_14_2 = imm13(&branch_jump_offset.to_string());
         let imm_14 = imm_14_2[0..1].to_string();
         let imm_13 = imm_14_2[1..2].to_string();
@@ -352,7 +352,7 @@ fn format_rs1_rs2_label(
             imm_20, imm_10_2, imm_11, imm_19_12, funct3, jal1_rd, J_JAL_OP
         );
         let jal2_rd = format_int_register("zero");
-        let jal2_offset = (jump_offset - 8) >> 1;
+        let jal2_offset = (jump_offset - 8) >> 2;
         let imm_20_2 = imm19(&jal2_offset.to_string());
         let imm_20 = imm_20_2[0..1].to_string();
         let imm_19_12 = imm_20_2[1..9].to_string();
@@ -677,11 +677,11 @@ fn format_fd(operands: &Vec<String>, funct3: u8, op: u8) -> String {
 fn rs2(operands: &Vec<String>, funct3: u8) -> String {
     assert_eq!(operands.len(), 1);
     let rs2 = format_int_register(&operands[0]);
-    let imm_11_5 = format!("{:>07}", 0);
-    let imm_4_0 = format!("{:>05}", 0);
+    let imm_12_6 = format!("{:>07}", 0);
+    let imm_5_0 = format!("{:>06}", 0);
     let rs1 = format!("{:>0REG_WIDTH$}", 0);
     let funct3 = format!("{:>0FUNCT3_WIDTH$b}", funct3);
-    format!("{}{}{}{}{}", imm_11_5, rs2, rs1, funct3, imm_4_0)
+    format!("{}{}{}{}{}", imm_12_6, rs2, rs1, funct3, imm_5_0)
 }
 
 fn format_rs2(operands: &Vec<String>, funct3: u8, op: u8) -> String {
@@ -1729,6 +1729,7 @@ pub fn assemble(path: &str, style: &str) {
                 if binary == "???" {
                     panic!("unexpected instruction: {}", line);
                 } else {
+                    assert_eq!(binary.len(), 32, "unexpected instruction: {}", line);
                     let num: u32 = u32::from_str_radix(binary, 2).unwrap();
                     match style {
                         "2" => {
