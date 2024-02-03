@@ -5,4 +5,5 @@
 *.ram
 out.txt
 *.asm
+*.data
 /test
