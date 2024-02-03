@@ -14,6 +14,9 @@ pub const JUMP_OFFSET_MAX: i32 = (1 << 20) - 1;
 pub const IMM13_MIN: i32 = -(1 << 12);
 pub const IMM13_MAX: i32 = (1 << 12) - 1;
 
+pub const IMM13_MASK: usize = (1 << IMM13_WIDTH) - 1;
+pub const UIMM_MASK: usize = (1 << UIMM_WIDTH) - 1;
+
 pub const I_INT_LOAD_OP: u8 = 0;
 pub const I_IMM_OP: u8 = 1;
 pub const S_INT_OP: u8 = 2;

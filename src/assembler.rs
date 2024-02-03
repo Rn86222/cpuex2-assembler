@@ -166,9 +166,9 @@ fn imm19(value: &String) -> String {
 
 fn uimm6(value: &String) -> String {
     let value_u32 = if value.len() >= 2 && &value[0..2] == "0x" {
-        u32::from_str_radix(&value[2..], 16).unwrap() & ((1 << UIMM_WIDTH) - 1)
+        u32::from_str_radix(&value[2..], 16).unwrap() & UIMM_MASK as u32
     } else {
-        value.parse::<u32>().unwrap() & ((1 << UIMM_WIDTH) - 1)
+        value.parse::<u32>().unwrap() & UIMM_MASK as u32
     };
     let formatted = format!("{:>0UIMM_WIDTH$b}", value_u32);
     let length = formatted.len();
@@ -698,13 +698,9 @@ fn resolve_load_address_symbol(
     let mut first_new_operands = vec![operands[0].clone()];
     let second_new_operands = vec![
         operands[0].clone(),
-        format!(
-            "{}({})",
-            (imm & ((1 << IMM13_WIDTH) - 1)),
-            operands[0].clone()
-        ),
+        format!("{}({})", (imm & IMM13_MASK), operands[0].clone()),
     ];
-    if (imm & ((1 << IMM13_WIDTH) - 1)) & (1 << (IMM13_WIDTH - 1)) != 0 {
+    if (imm & IMM13_MASK) & (1 << (IMM13_WIDTH - 1)) != 0 {
         first_new_operands.push(((imm >> IMM13_WIDTH) + 1).to_string());
     } else {
         first_new_operands.push((imm >> IMM13_WIDTH).to_string());
@@ -724,13 +720,9 @@ fn resolve_store_address_symbol(
     let mut first_new_operands = vec![operands[2].clone()];
     let second_new_operands = vec![
         operands[0].clone(),
-        format!(
-            "{}({})",
-            (imm & ((1 << IMM13_WIDTH) - 1)),
-            operands[2].clone()
-        ),
+        format!("{}({})", (imm & IMM13_MASK), operands[2].clone()),
     ];
-    if (imm & ((1 << IMM13_WIDTH) - 1)) & (1 << (IMM13_WIDTH - 1)) != 0 {
+    if (imm & IMM13_MASK) & (1 << (IMM13_WIDTH - 1)) != 0 {
         first_new_operands.push(((imm >> IMM13_WIDTH) + 1).to_string());
     } else {
         first_new_operands.push((imm >> IMM13_WIDTH).to_string());
@@ -960,15 +952,15 @@ fn instruction_to_binary(
                 new_operands.push(String::from("x0"));
                 new_operands.push(imm.to_string());
                 format_rd_rs1_imm13(&new_operands, 0b000, I_IMM_OP)
-            } else if imm & ((1 << IMM13_WIDTH) - 1) == 0 {
+            } else if imm & IMM13_MASK as i32 == 0 {
                 let mut new_operands = vec![operands[0].clone()];
                 new_operands.push((imm >> IMM13_WIDTH).to_string());
                 format_rd_upimm19(&new_operands, U_LUI_OP)
             } else {
                 let mut first_new_operands = vec![operands[0].clone()];
                 let mut second_new_operands = vec![operands[0].clone(), operands[0].clone()];
-                second_new_operands.push((imm & ((1 << IMM13_WIDTH) - 1)).to_string());
-                if (imm & ((1 << IMM13_WIDTH) - 1)) & (1 << (IMM13_WIDTH - 1)) != 0 {
+                second_new_operands.push((imm & IMM13_MASK as i32).to_string());
+                if (imm & IMM13_MASK as i32) & (1 << (IMM13_WIDTH - 1)) != 0 {
                     first_new_operands.push(((imm >> IMM13_WIDTH) + 1).to_string());
                 } else {
                     first_new_operands.push((imm >> IMM13_WIDTH).to_string());
@@ -1334,7 +1326,7 @@ fn line_count_of(
                     return 2;
                 }
             }
-            if (IMM13_MIN..=IMM13_MAX).contains(&imm) || imm & ((1 << IMM13_WIDTH) - 1) == 0 {
+            if (IMM13_MIN..=IMM13_MAX).contains(&imm) || imm & IMM13_MASK as i32 == 0 {
                 1
             } else {
                 2
@@ -1344,7 +1336,7 @@ fn line_count_of(
             assert_eq!(operands.len(), 2);
             if let Some(text_address) = text_label_address_map.get(&operands[1]) {
                 if *text_address <= IMM13_MAX as usize
-                    || text_address & ((1 << IMM13_WIDTH) - 1) == 0
+                    || text_address & IMM13_MASK == 0
                 {
                     1
                 } else {
@@ -1352,7 +1344,7 @@ fn line_count_of(
                 }
             } else if let Some((data_address, _)) = data_label_address_map.get(&operands[1]) {
                 if *data_address <= IMM13_MAX as usize
-                    || data_address & ((1 << IMM13_WIDTH) - 1) == 0
+                    || data_address & IMM13_MASK == 0
                 {
                     1
                 } else {
