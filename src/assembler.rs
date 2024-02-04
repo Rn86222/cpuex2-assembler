@@ -234,7 +234,7 @@ fn format_rd_rs1_uimm6(operands: &Vec<String>, funct3: u8, funct7: u8, op: u8) -
     )
 }
 
-fn rd_upimm20(operands: &Vec<String>) -> String {
+fn rd_upimm19(operands: &Vec<String>) -> String {
     assert_eq!(operands.len(), 2);
     let rd = format_int_register(&operands[0]);
     let upimm19 = upimm19(&operands[1]);
@@ -243,7 +243,7 @@ fn rd_upimm20(operands: &Vec<String>) -> String {
 }
 
 fn format_rd_upimm19(operands: &Vec<String>, op: u8) -> String {
-    format!("{}{:>0OPCODE_WIDTH$b}", rd_upimm20(operands), op)
+    format!("{}{:>0OPCODE_WIDTH$b}", rd_upimm19(operands), op)
 }
 
 fn rs2_imm13rs1(operands: &Vec<String>, funct3: u8) -> String {
@@ -965,8 +965,8 @@ fn instruction_to_binary(
                 } else {
                     first_new_operands.push((imm >> IMM13_WIDTH).to_string());
                 }
-                let first = format_rd_upimm19(&first_new_operands, I_IMM_OP);
-                let second = format_rd_rs1_imm13(&second_new_operands, 0b000, U_LUI_OP);
+                let first = format_rd_upimm19(&first_new_operands, U_LUI_OP);
+                let second = format_rd_rs1_imm13(&second_new_operands, 0b000, I_IMM_OP);
                 format!("{}\n{}", first, second)
             }
         }
@@ -1278,7 +1278,7 @@ fn instruction_to_binary(
             let new_operands = vec![String::from("ra"), operands[0].clone()];
             format_rd_label(
                 &new_operands,
-                I_JALR_OP,
+                J_JAL_OP,
                 current_address,
                 text_label_address_map,
             )
