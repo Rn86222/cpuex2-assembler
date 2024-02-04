@@ -1494,7 +1494,7 @@ type InitialDataValueMap = HashMap<usize, String>;
 fn create_data_label_address_value_map(
     lines: &Vec<String>,
 ) -> (DataLabelAddressValueMap, InitialDataValueMap, usize) {
-    println!("Creating data label address map...");
+    eprintln!("Creating data label address map...");
     let mut label_address_map: DataLabelAddressValueMap = HashMap::new();
     let mut initial_data_value_map: InitialDataValueMap = HashMap::new();
     let mut variable_address = DATA_SECTION_ORIGIN;
@@ -1571,7 +1571,7 @@ fn output_data_section(
     data_label_address_value_map: &DataLabelAddressValueMap,
     show_label: bool,
 ) {
-    println!("Outputting data section...");
+    eprintln!("Outputting data section...");
     let mut output_path = path.to_string();
     output_path.truncate(output_path.rfind('.').unwrap_or(output_path.len()));
     output_path.push_str(".data");
@@ -1620,7 +1620,7 @@ fn create_insts_initializing_data_section(
     data_address_value_vec: &Vec<(&usize, &String)>,
     data_section_size: usize,
 ) -> Vec<String> {
-    println!("Creating instructions initializing data section...");
+    eprintln!("Creating instructions initializing data section...");
     let mut initialize_data_section_insts = Vec::new();
     let (address, _) = data_address_value_vec[0];
     let line = format!("li t0, {}", address);
@@ -1674,23 +1674,33 @@ pub fn assemble(path: &str, style: &str) {
 
     let text_label_address_map =
         create_text_label_address_map(&lines, has_sections, &data_label_address_value_map);
+    let label_map_file_name = path
+        .trim_end_matches(path.split('.').last().unwrap_or(""))
+        .to_owned()
+        + "lmap";
+    let mut label_map_file = File::create(label_map_file_name).unwrap();
+    for (key, value) in text_label_address_map.iter() {
+        label_map_file
+            .write_fmt(format_args!("{} {}\n", key, value))
+            .unwrap();
+    }
 
     let out_file_name = path
         .trim_end_matches(path.split('.').last().unwrap_or(""))
         .to_owned()
         + style;
     let mut out_file = File::create(out_file_name).unwrap();
-    let asmpc_file_name = path
+    let pcasm_file_name = path
         .trim_end_matches(path.split('.').last().unwrap_or(""))
         .to_owned()
         + "pc.asm";
-    let mut asmpc_file = File::create(asmpc_file_name).unwrap();
+    let mut pcasm_file = File::create(pcasm_file_name).unwrap();
     let mut line_count = 0;
     let mut in_text_section = !has_sections;
-    println!("Assembling...");
+    eprintln!("Assembling...");
     for line in lines {
         if !in_text_section {
-            asmpc_file.write_fmt(format_args!("{}\n", line)).unwrap();
+            pcasm_file.write_fmt(format_args!("{}\n", line)).unwrap();
             if line == ".text" {
                 in_text_section = true;
             }
@@ -1699,14 +1709,14 @@ pub fn assemble(path: &str, style: &str) {
                 break;
             }
             if line.ends_with(':') {
-                asmpc_file.write_fmt(format_args!("{}\n", line)).unwrap();
+                pcasm_file.write_fmt(format_args!("{}\n", line)).unwrap();
                 continue;
             }
             if line.contains(".globl") {
-                asmpc_file.write_fmt(format_args!("{}\n", line)).unwrap();
+                pcasm_file.write_fmt(format_args!("{}\n", line)).unwrap();
                 continue;
             }
-            asmpc_file
+            pcasm_file
                 .write_fmt(format_args!("\t{} # PC {}\n", line, line_count * 4))
                 .unwrap();
             let inst = parse_instruction(&line);
@@ -1753,5 +1763,5 @@ pub fn assemble(path: &str, style: &str) {
             }
         }
     }
-    println!("Done.");
+    eprintln!("Done.");
 }
