@@ -1730,36 +1730,32 @@ pub fn assemble(path: &str, style: &str) {
             for binary in binary_lines {
                 if binary == "???" {
                     panic!("unexpected instruction: {}", line);
-                } else {
-                    assert_eq!(binary.len(), 32, "unexpected instruction: {}", line);
-                    let num: u32 = u32::from_str_radix(binary, 2).unwrap();
-                    match style {
-                        "2" => {
-                            out_file.write_fmt(format_args!("{:>032b}\n", num)).unwrap();
-                        }
-                        "16" => {
-                            out_file.write_fmt(format_args!("{:>08x}\n", num)).unwrap();
-                        }
-                        "ram" => {
-                            out_file
-                                .write_fmt(format_args!(
-                                    "RAM[{}] = 32'b{:>032b};\n",
-                                    line_count, num
-                                ))
-                                .unwrap();
-                        }
-                        _ => {
-                            let bytes_to_write: [u8; 4] = [
-                                (num & 0xff) as u8,
-                                ((num >> 8) & 0xff) as u8,
-                                ((num >> 16) & 0xff) as u8,
-                                ((num >> 24) & 0xff) as u8,
-                            ];
-                            out_file.write_all(&bytes_to_write).unwrap();
-                        }
-                    }
-                    line_count += 1;
                 }
+                assert_eq!(binary.len(), 32, "unexpected instruction: {}", line);
+                let num: u32 = u32::from_str_radix(binary, 2).unwrap();
+                match style {
+                    "2" => {
+                        out_file.write_fmt(format_args!("{:>032b}\n", num)).unwrap();
+                    }
+                    "16" => {
+                        out_file.write_fmt(format_args!("{:>08x}\n", num)).unwrap();
+                    }
+                    "ram" => {
+                        out_file
+                            .write_fmt(format_args!("RAM[{}] = 32'b{:>032b};\n", line_count, num))
+                            .unwrap();
+                    }
+                    _ => {
+                        let bytes_to_write: [u8; 4] = [
+                            (num & 0xff) as u8,
+                            ((num >> 8) & 0xff) as u8,
+                            ((num >> 16) & 0xff) as u8,
+                            ((num >> 24) & 0xff) as u8,
+                        ];
+                        out_file.write_all(&bytes_to_write).unwrap();
+                    }
+                }
+                line_count += 1;
             }
         }
     }
