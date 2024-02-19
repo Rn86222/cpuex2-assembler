@@ -484,25 +484,6 @@ fn format_rd_label(
     )
 }
 
-// fn fd_fs1_fs2_fs3(operands: &Vec<String>, funct2: u8, funct3: u8) -> String {
-//     assert_eq!(operands.len(), 4);
-//     let fd = format_float_register(&operands[0]);
-//     let fs1 = format_float_register(&operands[1]);
-//     let fs2 = format_float_register(&operands[2]);
-//     let fs3 = format_float_register(&operands[3]);
-//     let funct2 = format!("{:>02b}", funct2);
-//     let funct3 = format!("{:>0FUNCT3_WIDTH$b}", funct3);
-//     format!("{}{}{}{}{}{}", fs3, funct2, fs2, fs1, funct3, fd)
-// }
-
-// fn format_fd_fs1_fs2_fs3(operands: &Vec<String>, funct2: u8, funct3: u8, op: u8) -> String {
-//     format!(
-//         "{}{:>0OPCODE_WIDTH$b}",
-//         fd_fs1_fs2_fs3(operands, funct2, funct3),
-//         op
-//     )
-// }
-
 fn fd_fs1_fs2(operands: &Vec<String>, funct3: u8, funct7: u8) -> String {
     assert_eq!(operands.len(), 3);
     let fd = format_float_register(&operands[0]);
@@ -741,22 +722,6 @@ fn instruction_to_binary(
     let name: &str = &inst.name;
     let operands = &inst.operands;
     match name {
-        // "lb" => {
-        //     assert_eq!(operands.len(), 2);
-        //     if operands[1].find('(').is_none() {
-        //         resolve_load_address_symbol(data_label_address_map, operands, 0b000, 3)
-        //     } else {
-        //         format_rd_imm12rs1(operands, 0b000, 3)
-        //     }
-        // }
-        // "lh" => {
-        //     assert_eq!(operands.len(), 2);
-        //     if operands[1].find('(').is_none() {
-        //         resolve_load_address_symbol(data_label_address_map, operands, 0b001, 3)
-        //     } else {
-        //         format_rd_imm12rs1(operands, 0b001, 3)
-        //     }
-        // }
         "lw" => {
             assert_eq!(operands.len(), 2);
             if operands[1].find('(').is_none() {
@@ -765,8 +730,6 @@ fn instruction_to_binary(
                 format_rd_imm13rs1(operands, 0b010, I_INT_LOAD_OP)
             }
         }
-        // "lbu" => format_rd_imm13rs1(operands, 0b100, 3),
-        // "lhu" => format_rd_imm13rs1(operands, 0b101, 3),
         "addi" => format_rd_rs1_imm13(operands, 0b000, I_IMM_OP),
         "slli" => format_rd_rs1_uimm6(operands, 0b001, 0b0000000, I_IMM_OP),
         "slti" => format_rd_rs1_imm13(operands, 0b010, I_IMM_OP),
@@ -776,21 +739,6 @@ fn instruction_to_binary(
         "srai" => format_rd_rs1_uimm6(operands, 0b101, 0b0100000, I_IMM_OP),
         "ori" => format_rd_rs1_imm13(operands, 0b110, I_IMM_OP),
         "andi" => format_rd_rs1_imm13(operands, 0b111, I_IMM_OP),
-        // "auipc" => format_rd_upimm20(operands, 23),
-        // "sb" => {
-        //     if operands.len() == 3 && operands[2].find('(').is_none() {
-        //         resolve_store_address_symbol(data_label_address_map, operands, 0b000, 35)
-        //     } else {
-        //         format_rs2_imm12rs1(operands, 0b000, 35)
-        //     }
-        // }
-        // "sh" => {
-        //     if operands.len() == 3 && operands[2].find('(').is_none() {
-        //         resolve_store_address_symbol(data_label_address_map, operands, 0b001, 35)
-        //     } else {
-        //         format_rs2_imm12rs1(operands, 0b001, 35)
-        //     }
-        // }
         "sw" => {
             if operands.len() == 3 && operands[2].find('(').is_none() {
                 resolve_store_address_symbol(data_label_address_map, operands, 0b010, S_INT_OP)
@@ -802,7 +750,6 @@ fn instruction_to_binary(
         "sub" => format_rd_rs1_rs2(operands, 0b000, 0b0100000, R_INT_OP),
         "sll" => format_rd_rs1_rs2(operands, 0b001, 0b0000000, R_INT_OP),
         "slt" => format_rd_rs1_rs2(operands, 0b010, 0b0000000, R_INT_OP),
-        // "sltu" => format_rd_rs1_rs2(operands, 0b011, 0b0000000, R_INT_OP),
         "xor" => format_rd_rs1_rs2(operands, 0b100, 0b0000000, R_INT_OP),
         "srl" => format_rd_rs1_rs2(operands, 0b101, 0b0000000, R_INT_OP),
         "sra" => format_rd_rs1_rs2(operands, 0b101, 0b0100000, R_INT_OP),
@@ -837,12 +784,6 @@ fn instruction_to_binary(
             current_address,
             text_label_address_map,
         ),
-        // "bltu" => {
-        //     format_rs1_rs2_label(operands, 0b110, 99, current_address, text_label_address_map)
-        // }
-        // "bgeu" => {
-        //     format_rs1_rs2_label(operands, 0b111, 99, current_address, text_label_address_map)
-        // }
         "fbeq" => format_fs1_fs2_label(
             operands,
             0b000,
@@ -871,28 +812,8 @@ fn instruction_to_binary(
             current_address,
             text_label_address_map,
         ),
-        // "fbltu" => format_fs1_fs2_label(
-        //     operands,
-        //     0b110,
-        //     100,
-        //     current_address,
-        //     text_label_address_map,
-        // ),
-        // "fbgeu" => format_fs1_fs2_label(
-        //     operands,
-        //     0b111,
-        //     100,
-        //     current_address,
-        //     text_label_address_map,
-        // ),
         "jalr" => format_rd_rs1_imm13(operands, 0b000, I_JALR_OP),
         "jal" => format_rd_label(operands, J_JAL_OP, current_address, text_label_address_map),
-        // TODO: how to decide rounding mode? (funct3)
-        // TODO: how to decide floating point format? (funct7)
-        // "fmadd" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 67),
-        // "fmsub" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 71),
-        // "fnmsub" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 75),
-        // "fnmadd" => format_fd_fs1_fs2_fs3(operands, 0b00, 0b000, 79),
         "fadd" | "fadd.s" => format_fd_fs1_fs2(operands, 0b000, 0b0000000, R_FLOAT_OP),
         "fsub" | "fsub.s" => format_fd_fs1_fs2(operands, 0b000, 0b0000100, R_FLOAT_OP),
         "fmul" | "fmul.s" => format_fd_fs1_fs2(operands, 0b000, 0b0001000, R_FLOAT_OP),
@@ -903,28 +824,13 @@ fn instruction_to_binary(
         "fsgnj" | "fsgnj.s" => format_fd_fs1_fs2(operands, 0b000, 0b0010000, R_FLOAT_OP),
         "fsgnjn" | "fsgnjn.s" => format_fd_fs1_fs2(operands, 0b001, 0b0010000, R_FLOAT_OP),
         "fsgnjx" | "fsgnjx.s" => format_fd_fs1_fs2(operands, 0b010, 0b0010000, R_FLOAT_OP),
-        // "fmin" | "fmin.s" => format_fd_fs1_fs2(operands, 0b000, 0b0010100, 83),
-        // "fmax" | "fmax.s" => format_fd_fs1_fs2(operands, 0b001, 0b0010100, 83),
         "feq" | "feq.s" => format_rd_fs1_fs2(operands, 0b010, 0b1010000, R_FLOAT_OP),
         "flt" | "flt.s" => format_rd_fs1_fs2(operands, 0b001, 0b1010000, R_FLOAT_OP),
         "fle" | "fle.s" => format_rd_fs1_fs2(operands, 0b000, 0b1010000, R_FLOAT_OP),
-        // "fclass" => format_rd_fs1_with_rs2(operands, 0b001, 0b1110000, 0b00000, 83),
         "flw" => format_fd_imm13rs1(operands, 0b010, I_FLOAT_LOAD_OP),
         "fsw" => format_fs2_imm13rs1(operands, 0b010, S_FLOAT_OP),
         "fcvt.w.s" => format_rd_fs1_with_rs2(operands, 0b000, 0b1100000, 0b00000, R_FLOAT_OP),
-        // "fcvt.wu.s" => format_rd_fs1_with_rs2(operands, 0b000, 0b1100001, 0b00000, R_FLOAT_OP),
         "fcvt.s.w" => format_fd_rs1_with_rs2(operands, 0b000, 0b1101000, 0b00000, R_FLOAT_OP),
-        // "fcvt.s.wu" => format_fd_rs1_with_rs2(operands, 0b000, 0b1101001, 0b00000, R_FLOAT_OP),
-        // "fmv.x.w" => format_rd_fs1_with_rs2(operands, 0b000, 0b1110000, 0b00000, R_FLOAT_OP),
-        // "fmv.w.x" => format_fd_rs1_with_rs2(operands, 0b000, 0b1111000, 0b00000, R_FLOAT_OP),
-        // "mul" => format_rd_rs1_rs2(operands, 0b000, 0b0000001, 51),
-        // "mulh" => format_rd_rs1_rs2(operands, 0b001, 0b0000001, 51),
-        // "mulhsu" => format_rd_rs1_rs2(operands, 0b010, 0b0000001, 51),
-        // "mulhu" => format_rd_rs1_rs2(operands, 0b011, 0b0000001, 51),
-        // "div" => format_rd_rs1_rs2(operands, 0b100, 0b0000001, 51),
-        // "divu" => format_rd_rs1_rs2(operands, 0b101, 0b0000001, 51),
-        // "rem" => format_rd_rs1_rs2(operands, 0b110, 0b0000001, 51),
-        // "remu" => format_rd_rs1_rs2(operands, 0b111, 0b0000001, 51),
         // pseudo-instructions
         "nop" => {
             let new_operands = vec![String::from("x0"), String::from("x0"), String::from("0")];
@@ -975,31 +881,6 @@ fn instruction_to_binary(
             new_operands.push(String::from("0"));
             format_rd_rs1_imm13(&new_operands, 0b000, I_IMM_OP)
         }
-        // "not" => {
-        //     let mut new_operands = operands.clone();
-        //     new_operands.push(String::from("-1"));
-        //     format_rd_rs1_imm13(&new_operands, 0b100, 19)
-        // }
-        // "neg" => {
-        //     let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
-        //     format_rd_rs1_rs2(&new_operands, 0b000, 0b0100000, 51)
-        // }
-        // "seqz" => {
-        //     let new_operands = vec![operands[0].clone(), operands[1].clone(), String::from("1")];
-        //     format_rd_rs1_imm13(&new_operands, 0b011, 19)
-        // }
-        // "snez" => {
-        //     let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
-        //     format_rd_rs1_rs2(&new_operands, 0b011, 0b0000000, 51)
-        // }
-        // "sltz" => {
-        //     let new_operands = vec![operands[0].clone(), operands[1].clone(), String::from("x0")];
-        //     format_rd_rs1_rs2(&new_operands, 0b010, 0b0000000, 51)
-        // }
-        // "sgtz" => {
-        //     let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
-        //     format_rd_rs1_rs2(&new_operands, 0b010, 0b0000000, 51)
-        // }
         "beqz" => {
             let new_operands = vec![operands[0].clone(), String::from("x0"), operands[1].clone()];
             format_rs1_rs2_label(
@@ -1088,118 +969,6 @@ fn instruction_to_binary(
                 text_label_address_map,
             )
         }
-        // "bleu" => {
-        //     let new_operands = vec![
-        //         operands[1].clone(),
-        //         operands[0].clone(),
-        //         operands[2].clone(),
-        //     ];
-        //     format_rs1_rs2_label(
-        //         &new_operands,
-        //         0b111,
-        //         99,
-        //         current_address,
-        //         text_label_address_map,
-        //     )
-        // }
-        // "bgtu" => {
-        //     let new_operands = vec![
-        //         operands[1].clone(),
-        //         operands[0].clone(),
-        //         operands[2].clone(),
-        //     ];
-        //     format_rs1_rs2_label(
-        //         &new_operands,
-        //         0b110,
-        //         99,
-        //         current_address,
-        //         text_label_address_map,
-        //     )
-        // }
-        // "fbeqz" => {
-        //     let new_operands = vec![
-        //         operands[0].clone(),
-        //         String::from("ft0"),
-        //         operands[1].clone(),
-        //     ];
-        //     format_fs1_fs2_label(
-        //         &new_operands,
-        //         0b000,
-        //         100,
-        //         current_address,
-        //         text_label_address_map,
-        //     )
-        // }
-        // "fbnez" => {
-        //     let new_operands = vec![
-        //         operands[0].clone(),
-        //         String::from("ft0"),
-        //         operands[1].clone(),
-        //     ];
-        //     format_fs1_fs2_label(
-        //         &new_operands,
-        //         0b001,
-        //         100,
-        //         current_address,
-        //         text_label_address_map,
-        //     )
-        // }
-        // "fblez" => {
-        //     let new_operands = vec![
-        //         String::from("ft0"),
-        //         operands[0].clone(),
-        //         operands[1].clone(),
-        //     ];
-        //     format_fs1_fs2_label(
-        //         &new_operands,
-        //         0b101,
-        //         100,
-        //         current_address,
-        //         text_label_address_map,
-        //     )
-        // }
-        // "fbgez" => {
-        //     let new_operands = vec![
-        //         operands[0].clone(),
-        //         String::from("ft0"),
-        //         operands[1].clone(),
-        //     ];
-        //     format_fs1_fs2_label(
-        //         &new_operands,
-        //         0b101,
-        //         100,
-        //         current_address,
-        //         text_label_address_map,
-        //     )
-        // }
-        // "fbltz" => {
-        //     let new_operands = vec![
-        //         operands[0].clone(),
-        //         String::from("ft0"),
-        //         operands[1].clone(),
-        //     ];
-        //     format_fs1_fs2_label(
-        //         &new_operands,
-        //         0b100,
-        //         100,
-        //         current_address,
-        //         text_label_address_map,
-        //     )
-        // }
-        // "fbgtz" => {
-        //     let new_operands = vec![
-        //         String::from("ft0"),
-        //         operands[0].clone(),
-        //         operands[1].clone(),
-        //     ];
-        //     format_rs1_rs2_label(
-        //         &new_operands,
-        //         0b100,
-        //         100,
-        //         current_address,
-        //         text_label_address_map,
-        //     )
-        // }
         "fbge" => {
             let new_operands = vec![
                 operands[1].clone(),
@@ -1228,34 +997,6 @@ fn instruction_to_binary(
                 text_label_address_map,
             )
         }
-        // "fbleu" => {
-        //     let new_operands = vec![
-        //         operands[1].clone(),
-        //         operands[0].clone(),
-        //         operands[2].clone(),
-        //     ];
-        //     format_fs1_fs2_label(
-        //         &new_operands,
-        //         0b111,
-        //         100,
-        //         current_address,
-        //         text_label_address_map,
-        //     )
-        // }
-        // "fbgtu" => {
-        //     let new_operands = vec![
-        //         operands[1].clone(),
-        //         operands[0].clone(),
-        //         operands[2].clone(),
-        //     ];
-        //     format_fs1_fs2_label(
-        //         &new_operands,
-        //         0b110,
-        //         100,
-        //         current_address,
-        //         text_label_address_map,
-        //     )
-        // }
         "j" => {
             let new_operands = vec![String::from("x0"), operands[0].clone()];
             format_rd_label(
@@ -1274,7 +1015,6 @@ fn instruction_to_binary(
             format_rd_rs1_imm13(&new_operands, 0b000, I_JALR_OP)
         }
         "call" => {
-            // TODO: call far function
             let new_operands = vec![String::from("ra"), operands[0].clone()];
             format_rd_label(
                 &new_operands,
@@ -1284,17 +1024,6 @@ fn instruction_to_binary(
             )
         }
         // additional instructions
-        // "absdiff" => format_rd_rs1_rs2(operands, 0b000, 0b0110000, 51),
-        // "abs" => {
-        //     let new_operands = vec![operands[0].clone(), operands[1].clone(), String::from("x0")];
-        //     format_fd_fs1_fs2(&new_operands, 0b000, 0b0110000, 51)
-        // }
-        // "swapw" => format_rd_rs1_rs2(operands, 0b000, 0b0000000, 52),
-        // "swaph" => format_rd_rs1_rs2(operands, 0b001, 0b0000000, 52),
-        // "swapb" => format_rd_rs1_rs2(operands, 0b010, 0b0000000, 52),
-        // "notxor" => format_rd_rs1_rs2(operands, 0b100, 0b0000011, 51),
-        // "notor" => format_rd_rs1_rs2(operands, 0b100, 0b0000100, 51),
-        // "andnot" => format_rd_rs1_rs2(operands, 0b100, 0b0000101, 51),
         "in" => format_rd(operands, 0b000, IN_OP),
         "fin" => format_fd(operands, 0b001, IN_OP),
         "outchar" => format_rs2(operands, 0b000, OUT_OP),
@@ -1335,17 +1064,13 @@ fn line_count_of(
         "la" => {
             assert_eq!(operands.len(), 2);
             if let Some(text_address) = text_label_address_map.get(&operands[1]) {
-                if *text_address <= IMM13_MAX as usize
-                    || text_address & IMM13_MASK == 0
-                {
+                if *text_address <= IMM13_MAX as usize || text_address & IMM13_MASK == 0 {
                     1
                 } else {
                     2
                 }
             } else if let Some((data_address, _)) = data_label_address_map.get(&operands[1]) {
-                if *data_address <= IMM13_MAX as usize
-                    || data_address & IMM13_MASK == 0
-                {
+                if *data_address <= IMM13_MAX as usize || data_address & IMM13_MASK == 0 {
                     1
                 } else {
                     2
@@ -1354,13 +1079,8 @@ fn line_count_of(
                 2
             }
         }
-        "beq" | "bne" | "blt" | "bge" 
-        // | "bltu" | "bgeu" 
-        | "ble" | "bgt"
-        // | "bleu" | "bgtu"
-        | "fbeq" | "fbne" | "fblt" | "fbge" | "fbltu" | "fbgeu" | "fble" | "fbgt"
-        // | "fbleu" | "fbgtu"
-        => {
+        "beq" | "bne" | "blt" | "bge" | "ble" | "bgt" | "fbeq" | "fbne" | "fblt" | "fbge"
+        | "fbltu" | "fbgeu" | "fble" | "fbgt" => {
             assert_eq!(operands.len(), 3);
             if let Some(text_address) = text_label_address_map.get(&operands[2]) {
                 let offset = *text_address as i32 - line_count as i32 * 4;
@@ -1373,9 +1093,7 @@ fn line_count_of(
                 3
             }
         }
-        "beqz" | "bnez" | "blez" | "bgez" | "bltz" | "bgtz" 
-        // | "fbeqz" | "fbnez" | "fblez"| "fbgez" | "fbltz" | "fbgtz"
-        => {
+        "beqz" | "bnez" | "blez" | "bgez" | "bltz" | "bgtz" => {
             assert_eq!(operands.len(), 2);
             if let Some(text_address) = text_label_address_map.get(&operands[1]) {
                 let offset = *text_address as i32 - line_count as i32 * 4;
@@ -1388,7 +1106,6 @@ fn line_count_of(
                 3
             }
         }
-        // "lb" | "lh" | 
         "lw" => {
             assert_eq!(operands.len(), 2);
             if operands[1].find('(').is_none() {
@@ -1397,7 +1114,6 @@ fn line_count_of(
                 1
             }
         }
-        // "sb" | "sh" |
         "sw" => {
             if operands.len() == 3 && operands[2].find('(').is_none() {
                 2
