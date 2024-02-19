@@ -1,3 +1,6 @@
+default:
+	cargo run -- --file main.asm --style bin
+
 run:
 	cargo run -- --file minrt.s --style bin
 
