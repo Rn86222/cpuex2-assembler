@@ -15,3 +15,6 @@ bin:
 
 ram:
 	cargo run -- --file main.asm --style asm
+
+help:
+	cargo run -- --help
