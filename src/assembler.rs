@@ -426,23 +426,25 @@ fn format_fs1_fs2_label(
         let jal1_offset = 8 >> 2;
         let imm_20_2 = imm19(&jal1_offset.to_string());
         let imm_20 = imm_20_2[0..1].to_string();
-        let imm_19_12 = imm_20_2[1..8].to_string();
+        let imm_19_12 = imm_20_2[1..9].to_string();
         let imm_11 = imm_20_2[9..10].to_string();
         let imm_10_2 = imm_20_2[10..19].to_string();
+        let funct3 = format!("{:>0FUNCT3_WIDTH$b}", 0);
         let jal1 = format!(
-            "{}{}{}{}{}{:>0OPCODE_WIDTH$b}",
-            imm_20, imm_10_2, imm_11, imm_19_12, jal1_rd, J_JAL_OP
+            "{}{}{}{}{}{}{:>0OPCODE_WIDTH$b}",
+            imm_20, imm_10_2, imm_11, imm_19_12, funct3, jal1_rd, J_JAL_OP
         );
         let jal2_rd = format_int_register("zero");
         let jal2_offset = (jump_offset - 8) >> 2;
         let imm_20_2 = imm19(&jal2_offset.to_string());
         let imm_20 = imm_20_2[0..1].to_string();
-        let imm_19_12 = imm_20_2[1..8].to_string();
+        let imm_19_12 = imm_20_2[1..9].to_string();
         let imm_11 = imm_20_2[9..10].to_string();
         let imm_10_2 = imm_20_2[10..19].to_string();
+        let funct3 = format!("{:>0FUNCT3_WIDTH$b}", 0);
         let jal2 = format!(
-            "{}{}{}{}{}{:>0OPCODE_WIDTH$b}",
-            imm_20, imm_10_2, imm_11, imm_19_12, jal2_rd, J_JAL_OP
+            "{}{}{}{}{}{}{:>0OPCODE_WIDTH$b}",
+            imm_20, imm_10_2, imm_11, imm_19_12, funct3, jal2_rd, J_JAL_OP
         );
         format!("{}\n{}\n{}", branch, jal1, jal2)
     }
