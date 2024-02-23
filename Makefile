@@ -11,7 +11,7 @@ bin:
 	cargo run -- --file minrt.s --style 16
 
 ram:
-	cargo run -- --file minrt.s --style asm
+	cargo run -- --file minrt.s --style ram
 
 help:
 	cargo run -- --help
