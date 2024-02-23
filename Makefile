@@ -1,20 +1,17 @@
 default:
-	cargo run -- --file main.asm --style bin
-
-run:
 	cargo run -- --file minrt.s --style bin
 
 bin:
-	cargo run -- --file main.asm --style bin
+	cargo run -- --file minrt.s --style bin
 
 2:
-	cargo run -- --file main.asm --style 2
+	cargo run -- --file minrt.s --style 2
 
 16:
-	cargo run -- --file main.asm --style 16
+	cargo run -- --file minrt.s --style 16
 
 ram:
-	cargo run -- --file main.asm --style asm
+	cargo run -- --file minrt.s --style asm
 
 help:
 	cargo run -- --help
